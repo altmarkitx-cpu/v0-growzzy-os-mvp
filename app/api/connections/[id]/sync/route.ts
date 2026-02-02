@@ -25,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     // Get connection details
     const { data: connection, error: fetchError } = await supabase
-      .from('platform_connections')
+      .from('ad_accounts')
       .select('*')
       .eq('id', id)
       .single()
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Connection not found' }, { status: 404 })
     }
 
-    if (!connection.is_active) {
+    if (!connection.status) {
       console.log('[v0] Connection is inactive, skipping sync')
       return NextResponse.json({ message: 'Connection inactive' })
     }

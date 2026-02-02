@@ -28,10 +28,10 @@ export async function syncAllPlatforms(userId: string): Promise<{ synced: number
 
     // Get all active platform connections for this user
     const { data: connections, error: connError } = await supabaseAdmin
-      .from("platform_connections")
+      .from("ad_accounts")
       .select("*")
       .eq("user_id", userId)
-      .eq("is_active", true)
+      .eq("status", 'active')
 
     if (connError) throw connError
     if (!connections || connections.length === 0) {

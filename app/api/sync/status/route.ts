@@ -14,16 +14,16 @@ export async function GET(req: NextRequest) {
 
     // Get sync status for all user connections
     const { data: connections, error } = await supabaseAdmin
-      .from('platform_connections')
-      .select('id,platform,account_name,status,last_synced_at,created_at')
+      .from('ad_accounts')
+      .select('id,platform,account_name,status,last_sync_at,connected_at')
       .eq('user_id', userId)
-      .order('last_synced_at', { ascending: false });
+      .order('last_sync_at', { ascending: false });
 
     if (error) throw error;
 
     const syncStatus = {
       connections: connections || [],
-      lastSyncTime: connections?.[0]?.last_synced_at || null,
+      lastSyncTime: connections?.[0]?.last_sync_at || null,
       nextSyncTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 minutes from now
       isSyncing: false,
     };
