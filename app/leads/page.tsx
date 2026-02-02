@@ -1,0 +1,208 @@
+"use client"
+
+import React from "react"
+
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { useEffect, useState } from "react"
+import { Loader2, LogOut, Plus, FileUp } from "lucide-react"
+import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+
+export const dynamic = "force-dynamic"
+
+export default function LeadsPage() {
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  const [leads, setLeads] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', company: '' })
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/auth/me")
+        if (!response.ok) {
+          router.push("/auth")
+          return
+        }
+        const data = await response.json()
+        setUser(data.user)
+        
+        // Fetch leads
+        const leadsRes = await fetch(`/api/leads?userId=${data.user.id}`)
+        if (leadsRes.ok) {
+          const leadsData = await leadsRes.json()
+          setLeads(leadsData.leads || [])
+        }
+      } catch (error) {
+        console.error("[v0] Error:", error)
+        router.push("/auth")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAuth()
+  }, [router])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubmitting(true)
+
+    try {
+      const response = await fetch(`/api/leads?userId=${user.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+
+      if (response.ok) {
+        const newLead = await response.json()
+        setLeads([newLead, ...leads])
+        setFormData({ name: '', email: '', phone: '', company: '' })
+      }
+    } catch (error) {
+      console.error("[v0] Submit error:", error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" })
+    router.push("/auth")
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user) return null
+
+  return (
+    <div className="min-h-screen bg-background">
+      <nav className="border-b bg-card sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-primary">GROWZZY OS</h1>
+          <div className="flex gap-4 items-center">
+            <nav className="hidden md:flex gap-6">
+              <Link href="/dashboard" className="text-muted-foreground hover:text-primary">Dashboard</Link>
+              <Link href="/leads" className="text-foreground hover:text-primary font-medium">Leads</Link>
+              <Link href="/campaigns" className="text-muted-foreground hover:text-primary">Campaigns</Link>
+              <Link href="/reports" className="text-muted-foreground hover:text-primary">Reports</Link>
+            </nav>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-2 rounded"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold mb-2">Lead Management</h2>
+          <p className="text-muted-foreground">Manage and track all your leads in one place.</p>
+        </div>
+
+        {/* Add Lead Form */}
+        <Card className="p-6 mb-8">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Plus className="w-5 h-5" />
+            Add New Lead
+          </h3>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              placeholder="Full Name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+            <Input
+              type="email"
+              placeholder="Email Address"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required
+            />
+            <Input
+              type="tel"
+              placeholder="Phone Number"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            />
+            <Input
+              placeholder="Company Name"
+              value={formData.company}
+              onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+            />
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="md:col-span-2"
+            >
+              {submitting ? 'Adding...' : 'Add Lead'}
+            </Button>
+          </form>
+        </Card>
+
+        {/* Import CSV Button */}
+        <div className="mb-8">
+          <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+            <FileUp className="w-4 h-4" />
+            Import from CSV
+          </Button>
+        </div>
+
+        {/* Leads Table */}
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">All Leads ({leads.length})</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-4 font-medium text-sm">Name</th>
+                  <th className="text-left py-3 px-4 font-medium text-sm">Email</th>
+                  <th className="text-left py-3 px-4 font-medium text-sm">Company</th>
+                  <th className="text-left py-3 px-4 font-medium text-sm">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leads.length > 0 ? (
+                  leads.map((lead: any) => (
+                    <tr key={lead.id} className="border-b hover:bg-muted/50">
+                      <td className="py-3 px-4 text-sm">{lead.name}</td>
+                      <td className="py-3 px-4 text-sm">{lead.email}</td>
+                      <td className="py-3 px-4 text-sm">{lead.company || '-'}</td>
+                      <td className="py-3 px-4 text-sm">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                          {lead.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 px-4 text-center text-muted-foreground">
+                      No leads yet. Add your first lead above.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+    </div>
+  )
+}
