@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Mail, Lock, Loader2, AlertCircle } from 'lucide-react'
+import { Mail, Lock, Loader2, AlertCircle, Chrome } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,6 +15,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true)
+    try {
+      const result = await signIn('google', {
+        redirect: true,
+        callbackUrl: '/dashboard'
+      })
+    } catch (err: any) {
+      setError('Google sign-in failed. Please try again.')
+      setGoogleLoading(false)
+      console.error('[v0] Google sign-in error:', err)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -74,7 +90,7 @@ export default function LoginPage() {
                   placeholder="your@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
+                  disabled={loading || googleLoading}
                   className="pl-10"
                   required
                 />
@@ -90,14 +106,14 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
+                  disabled={loading || googleLoading}
                   className="pl-10"
                   required
                 />
               </div>
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full">
+            <Button type="submit" disabled={loading || googleLoading} className="w-full">
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -108,6 +124,39 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          <div className="mt-6">
+            <div className="relative mb-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-card text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+
+            <Button 
+              type="button"
+              variant="outline" 
+              className="w-full"
+              onClick={handleGoogleSignIn}
+              disabled={loading || googleLoading}
+            >
+              {googleLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  <Chrome className="mr-2 h-4 w-4" />
+                  Sign in with Google
+                </>
+              )}
+            </Button>
+          </div>
 
           <p className="text-sm text-muted-foreground mt-6 text-center">
             Don't have an account?{' '}

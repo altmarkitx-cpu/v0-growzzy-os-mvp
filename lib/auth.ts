@@ -1,5 +1,6 @@
 import NextAuth, { type NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
+import GoogleProvider from "next-auth/providers/google"
 import { createClient } from "@supabase/supabase-js"
 import bcrypt from "bcryptjs"
 
@@ -64,17 +65,26 @@ const authOptions: NextAuthOptions = {
         }
       },
     }),
+    GoogleProvider({
+      clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+      allowDangerousEmailAccountLinking: true,
+    }),
   ],
   pages: {
     signIn: "/auth/signin",
     error: "/auth/signin",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id
         token.email = user.email
         token.name = user.name
+      }
+      if (account?.provider === "google") {
+        token.provider = "google"
+        token.accessToken = account.access_token
       }
       return token
     },
@@ -85,6 +95,56 @@ const authOptions: NextAuthOptions = {
         session.user.name = token.name as string
       }
       return session
+    },
+    async signIn({ user, account, profile }) {
+      if (account?.provider === "google") {
+        try {
+          const supabase = getSupabaseClient()
+          
+          // Check if user exists
+          const { data: existingUser, error: fetchError } = await supabase
+            .from("users")
+            .select("*")
+            .eq("email", user.email!)
+            .single()
+
+          if (!fetchError && existingUser) {
+            // User exists, update last login
+            await supabase
+              .from("users")
+              .update({ last_login_at: new Date().toISOString() })
+              .eq("id", existingUser.id)
+            
+            user.id = existingUser.id
+            return true
+          }
+
+          // Create new user
+          const { data: newUser, error: createError } = await supabase
+            .from("users")
+            .insert({
+              email: user.email,
+              full_name: user.name,
+              password_hash: "",
+              provider: "google",
+              oauth_id: (profile as any)?.sub || user.id,
+            })
+            .select()
+            .single()
+
+          if (createError) {
+            console.error("[v0] Error creating Google user:", createError)
+            return false
+          }
+
+          user.id = newUser.id
+          return true
+        } catch (error) {
+          console.error("[v0] Google signIn callback error:", error)
+          return false
+        }
+      }
+      return true
     },
   },
   session: {

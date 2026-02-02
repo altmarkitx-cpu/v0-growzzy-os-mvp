@@ -10,16 +10,31 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { Loader2, AlertCircle, Chrome } from 'lucide-react'
 
 export default function SignInPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true)
+    try {
+      const result = await signIn('google', {
+        redirect: true,
+        callbackUrl: '/dashboard'
+      })
+    } catch (err: any) {
+      setError('Google sign-in failed. Please try again.')
+      setGoogleLoading(false)
+      console.error('[v0] Google sign-in error:', err)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
@@ -77,7 +92,7 @@ export default function SignInPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
                 required
-                disabled={loading}
+                disabled={loading || googleLoading}
                 className="mt-2"
               />
             </div>
@@ -91,12 +106,12 @@ export default function SignInPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                disabled={loading}
+                disabled={loading || googleLoading}
                 className="mt-2"
               />
             </div>
 
-            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+            <Button type="submit" className="w-full" size="lg" disabled={loading || googleLoading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -107,6 +122,40 @@ export default function SignInPage() {
               )}
             </Button>
           </form>
+
+          <div className="mt-6">
+            <div className="relative mb-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200 dark:border-gray-700" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+
+            <Button 
+              type="button"
+              variant="outline" 
+              className="w-full" 
+              size="lg"
+              onClick={handleGoogleSignIn}
+              disabled={loading || googleLoading}
+            >
+              {googleLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  <Chrome className="mr-2 h-4 w-4" />
+                  Sign in with Google
+                </>
+              )}
+            </Button>
+          </div>
 
           <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
