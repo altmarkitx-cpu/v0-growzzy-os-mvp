@@ -5,6 +5,9 @@ import { cookies } from 'next/headers'
 export async function GET(req: NextRequest) {
   try {
     const cookieStore = await cookies()
+    const allCookies = cookieStore.getAll()
+    console.log('[v0] Auth/me - Cookies received:', allCookies.map(c => c.name))
+    
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -29,7 +32,7 @@ export async function GET(req: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (error || !user) {
-      console.log('[v0] No authenticated user found')
+      console.log('[v0] Auth/me - No user found, error:', error?.message)
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }

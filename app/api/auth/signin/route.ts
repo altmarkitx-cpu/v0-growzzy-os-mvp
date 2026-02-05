@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
 
 export async function POST(req: Request) {
   try {
@@ -10,19 +9,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 })
     }
 
-    const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() {
-            return cookieStore.getAll()
+            return req.headers.get("cookie")?.split("; ").map((c) => {
+              const [name, ...value] = c.split("=")
+              return { name, value: value.join("=") }
+            }) || []
           },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-            } catch {}
+          setAll() {
+            // We handle cookies manually below
           },
         },
       },
@@ -37,7 +36,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid login credentials" }, { status: 401 })
     }
 
-    const res = NextResponse.json({
+    // Extract project ref from Supabase URL
+    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([^.]+)/)?.[1] || ""
+    
+    // Create response with cookies
+    const response = NextResponse.json({
       success: true,
       message: "Signed in successfully",
       user: {
@@ -45,27 +48,22 @@ export async function POST(req: Request) {
         email: data.user.email,
       },
     })
-
-    // Extract project ref from Supabase URL for cookie names
-    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([^.]+)/)?.[1] || ""
-    const accessTokenName = projectRef ? `sb-${projectRef}-access-token` : "sb-access-token"
-    const refreshTokenName = projectRef ? `sb-${projectRef}-refresh-token` : "sb-refresh-token"
-
-    // Persist Supabase session cookies (7 days)
-    res.cookies.set(accessTokenName, data.session.access_token, {
+    
+    // Set Supabase auth cookies with proper names
+    const cookieOptions = {
       httpOnly: true,
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
-      sameSite: "lax",
-    })
-    res.cookies.set(refreshTokenName, data.session.refresh_token, {
-      httpOnly: true,
-      path: "/",
+      sameSite: "lax" as const,
+    }
+    
+    response.cookies.set(`sb-${projectRef}-access-token`, data.session.access_token, cookieOptions)
+    response.cookies.set(`sb-${projectRef}-refresh-token`, data.session.refresh_token, {
+      ...cookieOptions,
       maxAge: 60 * 60 * 24 * 30,
-      sameSite: "lax",
     })
-
-    return res
+    
+    return response
   } catch (error: any) {
     console.error("[v0] Signin error:", error)
     return NextResponse.json({ error: error.message || "Sign in failed" }, { status: 500 })
