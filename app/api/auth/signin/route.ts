@@ -42,6 +42,8 @@ export async function POST(req: Request) {
 
     // Extract project ref from Supabase URL
     const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([^.]+)/)?.[1] || ""
+    console.log("[v0] Signin - Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL)
+    console.log("[v0] Signin - Extracted project ref:", projectRef)
     
     // Create response
     const response = NextResponse.json({
@@ -59,7 +61,7 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
       sameSite: "lax" as const,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
     }
     
     // Set the access token cookie
