@@ -8,7 +8,7 @@
     "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InplemRueWJ3dGFqZHZxcHhnY2lkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDAzMTc1NywiZXhwIjoyMDg1NjA3NzU3fQ.lYpny5r8KU-Ug6Qoi4kzqK7rNf-SphlS7AcJ6empkaA",
 
     "ENCRYPTION_KEY": "64a3ab9c25b04b95b197aaf8ed84551f3554c402cd724e019f82552686e04d17",
-    "CRON_SECRET": "@cron_secret",
+    "CRON_SECRET": "cron_9f3b7a2d8e4c6a1f5d0b9e7c2a4f8e6b",
 
     "OPENAI_API_KEY": "@openai_api_key",
 
@@ -19,4 +19,5 @@
     "GOOGLE_CLIENT_SECRET": "@google_client_secret"
   }
 }
+
 
