@@ -46,14 +46,19 @@ export async function POST(req: Request) {
       },
     })
 
+    // Extract project ref from Supabase URL for cookie names
+    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([^.]+)/)?.[1] || ""
+    const accessTokenName = projectRef ? `sb-${projectRef}-access-token` : "sb-access-token"
+    const refreshTokenName = projectRef ? `sb-${projectRef}-refresh-token` : "sb-refresh-token"
+
     // Persist Supabase session cookies (7 days)
-    res.cookies.set("sb-access-token", data.session.access_token, {
+    res.cookies.set(accessTokenName, data.session.access_token, {
       httpOnly: true,
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
       sameSite: "lax",
     })
-    res.cookies.set("sb-refresh-token", data.session.refresh_token, {
+    res.cookies.set(refreshTokenName, data.session.refresh_token, {
       httpOnly: true,
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
