@@ -10,14 +10,15 @@
     "ENCRYPTION_KEY": "64a3ab9c25b04b95b197aaf8ed84551f3554c402cd724e019f82552686e04d17",
     "CRON_SECRET": "cron_9f3b7a2d8e4c6a1f5d0b9e7c2a4f8e6b",
 
-    "OPENAI_API_KEY": "@openai_api_key",
+    "OPENAI_API_KEY": "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",
 
-    "META_APP_ID": "@meta_app_id",
-    "META_APP_SECRET": "@meta_app_secret",
+    "META_APP_ID": "1902584800655731",
+    "META_APP_SECRET": "9074a56d7e14551e43e97b248796af73",
 
-    "GOOGLE_CLIENT_ID": "@google_client_id",
-    "GOOGLE_CLIENT_SECRET": "@google_client_secret"
+    "GOOGLE_CLIENT_ID": "630777222372-dlgpk81duktjj9p9964mv19joli56icv.apps.googleusercontent.com",
+    "GOOGLE_CLIENT_SECRET": "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"
   }
 }
+
 
 
