@@ -9,19 +9,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 })
     }
 
+    // Create response object that we'll attach cookies to
+    let response = NextResponse.json({})
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() {
-            return req.headers.get("cookie")?.split("; ").map((c) => {
+            const cookieHeader = req.headers.get("cookie")
+            if (!cookieHeader) return []
+            return cookieHeader.split("; ").map((c) => {
               const [name, ...value] = c.split("=")
               return { name, value: value.join("=") }
-            }) || []
+            })
           },
-          setAll() {
-            // We handle cookies manually below
+          setAll(cookiesToSet) {
+            // Let Supabase set the cookies on our response
+            cookiesToSet.forEach(({ name, value, options }) => {
+              response.cookies.set(name, value, options)
+            })
           },
         },
       },
@@ -36,11 +44,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid login credentials" }, { status: 401 })
     }
 
-    // Extract project ref from Supabase URL
-    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([^.]+)/)?.[1] || ""
-    
-    // Create response with cookies
-    const response = NextResponse.json({
+    // Create final response with user data
+    const finalResponse = NextResponse.json({
       success: true,
       message: "Signed in successfully",
       user: {
@@ -48,26 +53,23 @@ export async function POST(req: Request) {
         email: data.user.email,
       },
     })
-    
-    // Set Supabase auth cookies with proper names and secure flag for HTTPS
-    const cookieOptions = {
-      httpOnly: true,
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-      sameSite: "lax" as const,
-      secure: true,
-    }
-    
-    response.cookies.set(`sb-${projectRef}-access-token`, data.session.access_token, cookieOptions)
-    response.cookies.set(`sb-${projectRef}-refresh-token`, data.session.refresh_token, {
-      ...cookieOptions,
-      maxAge: 60 * 60 * 24 * 30,
+
+    // Copy all cookies from the Supabase response to the final response
+    response.cookies.getAll().forEach((cookie) => {
+      finalResponse.cookies.set(cookie.name, cookie.value, {
+        httpOnly: cookie.httpOnly,
+        path: cookie.path,
+        maxAge: cookie.maxAge,
+        sameSite: cookie.sameSite,
+        secure: cookie.secure,
+        domain: cookie.domain,
+        expires: cookie.expires,
+      })
     })
-    
-    console.log("[v0] Signin - Setting cookies for project:", projectRef)
-    console.log("[v0] Signin - Access token cookie:", `sb-${projectRef}-access-token`)
-    
-    return response
+
+    console.log("[v0] Signin - Supabase set cookies:", response.cookies.getAll().map(c => c.name))
+
+    return finalResponse
   } catch (error: any) {
     console.error("[v0] Signin error:", error)
     return NextResponse.json({ error: error.message || "Sign in failed" }, { status: 500 })
