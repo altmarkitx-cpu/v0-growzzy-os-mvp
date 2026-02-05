@@ -28,12 +28,16 @@ export default function DashboardPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log("[v0] Dashboard - Checking auth...")
         const response = await fetch("/api/auth/me", { credentials: "include" })
+        console.log("[v0] Dashboard - Auth response status:", response.status)
         if (!response.ok) {
+          console.log("[v0] Dashboard - Auth failed, redirecting to auth page")
           router.push("/auth")
           return
         }
         const data = await response.json()
+        console.log("[v0] Dashboard - Auth success, user:", data.user?.email)
         setUser(data.user)
 
         // Fetch all analytics data
