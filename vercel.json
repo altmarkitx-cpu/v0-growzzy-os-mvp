@@ -2,19 +2,20 @@
   "crons": [
     {
       "path": "/api/cron/sync-all-platforms",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/check-automations",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ],
   "buildCommand": "pnpm run build",
   "installCommand": "pnpm install",
   "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "@supabase_url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase_anon_key",
-    "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
+    "NEXT_PUBLIC_SUPABASE_URL": "https://zezdnybwtajdvqpxgcid.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InplemRueWJ3dGFqZHZxcHhnY2lkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwMzE3NTcsImV4cCI6MjA4NTYwNzc1N30.bFa4UrmdwiNFyuQP71BTzGu0zr-2QaGYltdFrnDvRVg",
+    "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InplemRueWJ3dGFqZHZxcHhnY2lkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDAzMTc1NywiZXhwIjoyMDg1NjA3NzU3fQ.lYpny5r8KU-Ug6Qoi4kzqK7rNf-SphlS7AcJ6empkaA",
+    "NEXT_PUBLIC_APP_URL": "https://v0-growzzyos.vercel.app",
     "ENCRYPTION_KEY": "@encryption_key",
     "CRON_SECRET": "@cron_secret",
     "OPENAI_API_KEY": "@openai_api_key",
