@@ -33,11 +33,11 @@ export async function POST(req: Request) {
       password,
     })
 
-    if (error || !data.user) {
+    if (error || !data.session || !data.user) {
       return NextResponse.json({ error: "Invalid login credentials" }, { status: 401 })
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       message: "Signed in successfully",
       user: {
@@ -45,6 +45,22 @@ export async function POST(req: Request) {
         email: data.user.email,
       },
     })
+
+    // Persist Supabase session cookies (7 days)
+    res.cookies.set("sb-access-token", data.session.access_token, {
+      httpOnly: true,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+      sameSite: "lax",
+    })
+    res.cookies.set("sb-refresh-token", data.session.refresh_token, {
+      httpOnly: true,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+      sameSite: "lax",
+    })
+
+    return res
   } catch (error: any) {
     console.error("[v0] Signin error:", error)
     return NextResponse.json({ error: error.message || "Sign in failed" }, { status: 500 })

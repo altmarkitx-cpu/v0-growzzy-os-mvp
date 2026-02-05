@@ -14,11 +14,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Get auth cookie - check for Supabase session
-  const sessionCookie = request.cookies.get("sb-access-token")?.value || 
-                         request.cookies.get("sb-refresh-token")?.value
+  // Check for Supabase session cookie (sb-<project>-access-token)
+  const hasSession = request.cookies.getAll().some(({ name }: { name: string }) =>
+    name.startsWith("sb-") && name.endsWith("-access-token")
+  )
 
-  if (!sessionCookie) {
+  if (!hasSession) {
     // Redirect to signin if not authenticated
     const loginUrl = new URL("/auth", request.url)
     loginUrl.searchParams.set("callbackUrl", pathname)
