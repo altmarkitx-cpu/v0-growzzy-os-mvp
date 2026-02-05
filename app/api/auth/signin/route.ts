@@ -49,12 +49,13 @@ export async function POST(req: Request) {
       },
     })
     
-    // Set Supabase auth cookies with proper names
+    // Set Supabase auth cookies with proper names and secure flag for HTTPS
     const cookieOptions = {
       httpOnly: true,
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
       sameSite: "lax" as const,
+      secure: true,
     }
     
     response.cookies.set(`sb-${projectRef}-access-token`, data.session.access_token, cookieOptions)
@@ -62,6 +63,9 @@ export async function POST(req: Request) {
       ...cookieOptions,
       maxAge: 60 * 60 * 24 * 30,
     })
+    
+    console.log("[v0] Signin - Setting cookies for project:", projectRef)
+    console.log("[v0] Signin - Access token cookie:", `sb-${projectRef}-access-token`)
     
     return response
   } catch (error: any) {
