@@ -3,7 +3,7 @@ import { getOAuthConfig, buildOAuthUrl } from '@/lib/oauth-config';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_KEY || '');
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '');
 
 export const dynamic = 'force-dynamic';
 
