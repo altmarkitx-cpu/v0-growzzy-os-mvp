@@ -7,6 +7,8 @@ export async function GET(req: NextRequest) {
     const cookieStore = await cookies()
     const allCookies = cookieStore.getAll()
     console.log('[v0] Auth/me - Cookies received:', allCookies.map(c => c.name))
+    console.log('[v0] Auth/me - Cookie count:', allCookies.length)
+    console.log('[v0] Auth/me - Cookie details:', allCookies.map(c => ({ name: c.name, value: c.value.substring(0, 20) + '...' })))
     
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
