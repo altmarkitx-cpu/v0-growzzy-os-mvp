@@ -40,6 +40,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid login credentials" }, { status: 401 })
     }
 
+    console.log("[v0] Signin - Session data:", {
+      hasSession: !!data.session,
+      hasAccessToken: !!data.session?.access_token,
+      hasRefreshToken: !!data.session?.refresh_token,
+      accessTokenLength: data.session?.access_token?.length,
+      refreshTokenLength: data.session?.refresh_token?.length
+    })
+    
     // Extract project ref from Supabase URL
     const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([^.]+)/)?.[1] || ""
     console.log("[v0] Signin - Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL)
