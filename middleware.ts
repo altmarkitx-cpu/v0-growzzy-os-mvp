@@ -14,8 +14,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Get auth cookie - simple check without using NextAuth (which can't run in Edge Runtime)
-  const sessionCookie = request.cookies.get("next-auth.session-token")?.value
+  // Get auth cookie - check for Supabase session
+  const sessionCookie = request.cookies.get("sb-access-token")?.value || 
+                         request.cookies.get("sb-refresh-token")?.value
 
   if (!sessionCookie) {
     // Redirect to signin if not authenticated

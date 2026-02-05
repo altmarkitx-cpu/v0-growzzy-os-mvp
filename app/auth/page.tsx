@@ -47,7 +47,12 @@ export default function AuthPage() {
           throw new Error(data.error || "Login failed")
         }
 
+        console.log("[v0] Login successful, redirecting to dashboard...")
         router.push("/dashboard")
+        // Fallback redirect
+        setTimeout(() => {
+          window.location.href = "/dashboard"
+        }, 1000)
         setIsLoading(false)
       } else {
         const response = await fetch("/api/auth/register", {
