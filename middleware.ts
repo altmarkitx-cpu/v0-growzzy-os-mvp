@@ -1,34 +1,36 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
 
-  // List of protected routes that require authentication
-  const protectedRoutes = ["/dashboard", "/connections", "/reports", "/automations", "/campaigns"]
-
-  // Check if current path is protected
-  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
-
-  if (!isProtectedRoute) {
-    return NextResponse.next()
-  }
-
-  // Check for Supabase session cookie (sb-<project>-access-token)
-  const hasSession = request.cookies.getAll().some(({ name }: { name: string }) =>
-    name.startsWith("sb-") && name.endsWith("-access-token")
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => req.cookies.getAll(),
+        setAll: (cookiesToSet) => {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            res.cookies.set(name, value, options)
+          })
+        }
+      }
+    }
   )
 
-  if (!hasSession) {
-    // Redirect to signin if not authenticated
-    const loginUrl = new URL("/auth", request.url)
-    loginUrl.searchParams.set("callbackUrl", pathname)
-    return NextResponse.redirect(loginUrl)
+  const {
+    data: { user }
+  } = await supabase.auth.getUser()
+
+  if (!user && req.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/auth', req.url))
   }
 
-  return NextResponse.next()
+  return res
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/connections/:path*", "/reports/:path*", "/automations/:path*", "/campaigns/:path*"],
+  matcher: ['/dashboard/:path*']
 }
