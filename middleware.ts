@@ -10,12 +10,11 @@ export async function middleware(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => req.cookies.getAll(),
-        setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            res.cookies.set(name, value, options)
-          })
-        }
+        get(name: string) {
+          return req.cookies.get(name)?.value
+        },
+        set() {},
+        remove() {}
       }
     }
   )
@@ -24,13 +23,19 @@ export async function middleware(req: NextRequest) {
     data: { user }
   } = await supabase.auth.getUser()
 
+  // 🔒 Protect dashboard
   if (!user && req.nextUrl.pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/auth', req.url))
+  }
+
+  // 🚫 Prevent logged-in users from seeing /auth
+  if (user && req.nextUrl.pathname.startsWith('/auth')) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
   return res
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*']
+  matcher: ['/dashboard/:path*', '/auth/:path*']
 }
