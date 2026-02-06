@@ -400,7 +400,7 @@ export default function DashboardPage() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="p-8 bg-white min-h-screen">
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div>

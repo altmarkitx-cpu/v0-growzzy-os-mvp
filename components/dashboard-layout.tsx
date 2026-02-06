@@ -148,7 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-screen bg-gray-50/50">
+    <div className="flex h-screen bg-white">
       {/* Sidebar */}
       <div className={cn(
         "bg-white border-r border-gray-200 transition-all duration-300 flex flex-col",

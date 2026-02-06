@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
-import { Palette } from "lucide-react"
+import { BarChart3 } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
-export default function CreativesPage() {
+export default function AnalyticsPlatformsPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
 
@@ -22,7 +22,7 @@ export default function CreativesPage() {
         const data = await response.json()
         setUser(data.user)
       } catch (error) {
-        console.error("[v0] Creatives error:", error)
+        console.error("[v0] Analytics error:", error)
         router.push("/auth")
       }
     }
@@ -38,17 +38,17 @@ export default function CreativesPage() {
         <div className="max-w-4xl mx-auto">
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Palette className="w-8 h-8 text-gray-400" />
+              <BarChart3 className="w-8 h-8 text-gray-400" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">Ad Creatives</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Analytics Platforms</h1>
             <p className="text-lg text-gray-600 mb-8">This section is under active development</p>
             <div className="bg-gray-50 rounded-lg p-8 max-w-md mx-auto">
               <div className="text-gray-600 space-y-2">
-                <p>🎨 We're building powerful creative management tools to help you:</p>
-                <p>• AI-powered creative generation</p>
-                <p>• Creative performance analytics</p>
-                <p>• A/B testing capabilities</p>
-                <p>• Creative library management</p>
+                <p>📱 We're building platform-specific analytics to help you understand:</p>
+                <p>• Platform performance comparison</p>
+                <p>• Cross-platform insights</p>
+                <p>• Platform-specific ROI</p>
+                <p>• Budget optimization recommendations</p>
               </div>
             </div>
             <div className="mt-8 text-sm text-gray-500">
