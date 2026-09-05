@@ -46,10 +46,14 @@ export function useSyncStatus(userId: string | null) {
     setError(null);
 
     try {
+      // NextAuth v5 uses HttpOnly cookies for session auth. The browser
+      // sends them automatically with same-origin fetch; we must NOT
+      // override with a Bearer token from localStorage (which is always
+      // null under NextAuth v5 and was breaking every trigger call).
       const response = await fetch('/api/sync/trigger', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
           'Content-Type': 'application/json',
         },
       });

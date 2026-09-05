@@ -315,12 +315,17 @@ export function AgentChat({ threadId = "growzzy-agent" }: AgentChatProps) {
     },
   });
 
-  // Load existing conversation from DB on mount (when threadId is a real UUID)
-  const conversationLoaded = useRef(false);
+  // Load existing conversation from DB on mount (when threadId is a real UUID).
+  // We use a per-threadId flag set in the effect itself so a previous unmount
+  // (navigation, tab close) doesn't permanently disable the load — the
+  // previous version set conversationLoaded.current = true BEFORE the fetch
+  // resolved, so a mid-fetch unmount left the ref true forever and remount
+  // never retried.
+  const inFlightLoadRef = useRef<string | null>(null);
   useEffect(() => {
-    if (conversationLoaded.current) return;
     if (!threadId || threadId === "growzzy-agent") return;
-    conversationLoaded.current = true;
+    if (inFlightLoadRef.current === threadId) return;
+    inFlightLoadRef.current = threadId;
     (async () => {
       try {
         const res = await fetch(`/api/ai/conversations/${encodeURIComponent(threadId)}`);

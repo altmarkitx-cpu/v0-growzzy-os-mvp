@@ -6,6 +6,13 @@ if (process.env.NODE_ENV === "production" && !authSecret) {
     throw new Error("AUTH_SECRET or NEXTAUTH_SECRET must be configured in production.")
 }
 
+// In production we require a real secret. In development we fall back to a
+// stable string so the app boots without env vars; the throw above prevents
+// the production path from ever using the fallback.
+const resolvedSecret = authSecret || (process.env.NODE_ENV === "production"
+    ? (() => { throw new Error("AUTH_SECRET missing in production") })()
+    : "development-only-secret-do-not-deploy")
+
 export const authConfig = {
     session: { strategy: 'jwt', maxAge: 7 * 24 * 60 * 60 },
     jwt: { maxAge: 7 * 24 * 60 * 60 },
@@ -13,7 +20,7 @@ export const authConfig = {
         signIn: '/auth',
     },
     trustHost: true,
-    secret: authSecret || "development-only-secret-do-not-deploy",
+    secret: resolvedSecret,
     callbacks: {
         async jwt({ token, user }) {
             if (user) {
