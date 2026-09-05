@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   FileText,
   Download,
@@ -298,7 +299,7 @@ export function ArtifactModal({
 
         {/* Content body */}
         <div className="flex-1 overflow-y-auto p-6 md:p-10 prose prose-invert max-w-none prose-headings:font-bold prose-h1:text-2xl prose-h2:text-lg prose-h3:text-base prose-table:border prose-table:border-white/10 prose-th:bg-white/5 prose-td:border-white/5 prose-blockquote:border-l-primary prose-blockquote:bg-white/5 prose-blockquote:py-1 prose-blockquote:px-3 text-white/90">
-          <ReactMarkdown>{markdown}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
         </div>
       </div>
     </div>

@@ -673,7 +673,7 @@ export async function POST(req: Request) {
             platform: z.enum(["GOOGLE"]).describe("Target ad network platform. Growzzy currently supports Google Ads only (Search + Display image formats)."),
             targetAudience: z.string().describe("Primary ICP role & company profile"),
             budgetRecommendation: z.string().describe("Recommended daily/monthly budget with allocation"),
-            markdownPlan: z.string().describe("Full, rich 8-section Campaign Strategy Document in Markdown: 1. Executive Strategy & Market Opportunity, 2. ICP Deep Dive, 3. Full Funnel Architecture, 4. Channel-Specific Architecture, 5. Direct-Response Messaging Framework, 6. Competitive Positioning, 7. Budget & Scaling Roadmap, 8. KPI Benchmarks"),
+            markdownPlan: z.string().describe("EXECUTION BLUEPRINT — the user's build sheet for Google Ads Manager. MUST follow this exact 7-section structure with Setting|Value|Why markdown tables (with proper |---| separator rows) and bold **CRITICAL:** callouts: 1. Campaign Level Settings, 2. Ad Set Level Settings (Budget & Schedule, Audience, Demographics, Locations, Detailed Targeting, Exclusions, Placements), 3. Ad Level Settings (Primary Text Variations, Headlines RSA, Description, CTA & Final URL), 4. Conversion Tracking Checklist, 5. Week-by-Week Optimization (Week 1 Launch+Learn, Week 2 First Cut, Week 3 Optimize, Week 4 Review+Plan Month 2), 6. KPI Targets (Metric|Target|Red Flag), 7. Pre-Launch Checklist (15-20 numbered items). End with **Go Live.** Every Setting|Value|Why table MUST have a |---| separator row with one cell per column. End the document with a bold 'Go Live.' sign-off on its own line."),
             steps: z.array(
               z.object({
                 title: z.string().describe("Execution milestone title"),
@@ -730,6 +730,48 @@ export async function POST(req: Request) {
             const LANDING_URL = /(?:final\s*url|landing\s*page|landing\s*url)[:\s]+https?:\/\//i;
             if (!LANDING_URL.test(mdRaw) && md.length > 500) {
               issues.push(`No landing page URL found in the strategy. Always include a specific destination URL.`);
+            }
+
+            // 5. Markdown table structural check — every "| a | b | c |" header
+            //    row must be followed by a "|---|---|---|" separator row before
+            //    the next data row. A missing separator makes GFM render the
+            //    table as plain inline text (the "fuck" output).
+            const lines = mdRaw.split(/\r?\n/);
+            for (let i = 0; i < lines.length - 1; i += 1) {
+              const headerLine = lines[i].trim();
+              const nextLine = lines[i + 1].trim();
+              if (/^\s*\|.+\|\s*$/.test(headerLine) && !/^\s*\|.+\|\s*$/.test(nextLine) && !/^\s*\|[\s\-:|]+\|\s*$/.test(nextLine)) {
+                issues.push(`Malformed markdown table on line ${i + 1}: a table header row "${headerLine.slice(0, 60)}…" must be followed by a separator row like "|---|---|---|". Without it, the entire table renders as plain text. Re-emit the table with the separator row.`);
+                break;
+              }
+            }
+
+            // 6. Setting|Value|Why completeness — the blueprint requires every
+            //    settings table to have all three columns. Catch the common
+            //    omission where the model writes "| Setting | Value |" (2 cols)
+            //    or "| Setting | Value | Why |" but the data rows have only 2
+            //    cells.
+            const tableBlocks = mdRaw.split(/\n\n+/);
+            for (const block of tableBlocks) {
+              const blockLines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+              if (blockLines.length < 2) continue;
+              const headerCells = (blockLines[0].match(/\|/g) || []).length - 1;
+              if (headerCells < 3) continue;
+              for (let j = 1; j < blockLines.length; j += 1) {
+                const line = blockLines[j];
+                if (/^\s*\|[\s\-:|]+\|\s*$/.test(line)) continue;
+                const cells = (line.match(/\|/g) || []).length - 1;
+                if (cells !== headerCells) {
+                  issues.push(`Malformed table: header row has ${headerCells} columns but a data row has ${cells} columns. Every data row must match the header column count.`);
+                  break;
+                }
+              }
+              if (issues.length > 0 && issues[issues.length - 1].startsWith("Malformed table")) break;
+            }
+
+            // 7. End the document with the Go Live sign-off.
+            if (md.length > 500 && !/go\s+live\.?/i.test(mdRaw.slice(-200))) {
+              issues.push(`Strategy document must end with a bold "Go Live." sign-off on its own line. This is the user's checklist completion cue.`);
             }
 
             if (issues.length > 0) {

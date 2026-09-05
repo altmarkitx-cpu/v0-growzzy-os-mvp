@@ -61,6 +61,7 @@ import {
 import { ThinkingBlock } from "@/components/growzzy/thinking-block";
 import { StatusPill } from "@/components/growzzy/status-pill";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Check,
   ChevronDown,
@@ -1313,7 +1314,7 @@ function PlanCard({
         {/* Strategy Document Body */}
         {input.markdownPlan ? (
           <div className="p-4 text-[12.5px] leading-relaxed text-foreground max-h-[440px] overflow-y-auto prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown>{input.markdownPlan}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{input.markdownPlan}</ReactMarkdown>
           </div>
         ) : (
           <div className="p-4 space-y-3">
