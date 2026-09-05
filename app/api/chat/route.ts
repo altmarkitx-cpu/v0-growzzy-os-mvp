@@ -77,14 +77,16 @@ Acknowledge the user's brand memory context and any attached files. Never ask wh
 2. CLARIFYING SETUP QUESTIONS (askUser):
 CRITICAL: You MUST call the askUser tool to ask questions — NEVER write questions as plain text. The askUser tool renders them as a clickable card UI with category icons, descriptions, and a RECOMMENDED pill.
 
-Ask 2-3 strategic setup questions tailored to their specific business:
-- Question 1 (Core Goal & Outcome): Inbound Qualified Leads, Rapid Sales Pipeline, Direct Bookings, E-commerce Purchases.
-- Question 2 (Target Conversion Action): Book Technical Demo / Architecture Review, Submit Lead Form, Sign Up for Free Trial, Instant Checkout.
-- Question 3 (Platform & Strategy Angle): Google Ads High-Intent Search, Google Display/Discovery Image, Multi-Channel (Google Search + Display).
+Ask 3-4 strategic setup questions **derived from the user's actual business and offer**, NOT a generic template. Cover ONLY the fields that are not already in brand context:
+- If budget is unknown, ask for it (one question, with tiered options like ₹500/day / ₹1,000/day / ₹2,500/day / custom).
+- If the landing page URL is unknown, ask for it (one free-text-input question).
+- If the core conversion action is unclear, ask for it (3-4 specific options based on the user's offer — e.g. for a SaaS: "Book demo" / "Start free trial" / "Talk to sales" / "Other").
+- If launch timing is unclear, ask for it (ASAP / 2 weeks / this quarter / flexible).
+Skip any question whose answer is already in brand context or was provided in the user's message. Do NOT ask the same question twice.
 
-For each question, provide 3-4 options with category labels, short benefit descriptions, and mark exactly ONE option as recommended:true.
+For each question you DO ask, provide 3-4 options that are specific to the user's business. Avoid generic category labels like "Inbound Qualified Leads" or "Multi-Channel" — write the option text in the user's own words about their actual offer.
 
-PLATFORM POLICY: Growzzy currently supports **Google Ads only** (Search + Display/Discovery image formats). Do NOT ask about Meta, TikTok, LinkedIn, or any other network — assume Google Ads and proceed.
+PLATFORM POLICY: Growzzy currently supports **Google Ads only** (Search + Display/Discovery image formats). Do NOT ask about Meta, TikTok, LinkedIn, or any other network — assume Google Ads and proceed. Do NOT offer a "Multi-Channel" option since we don't yet support it.
 
 3. EXECUTION PLAN PREVIEW (previewExecution):
 MANDATORY: After the user submits askUser answers, BEFORE running any other tool, call previewExecution to render an "Execution Plan" card. The card lists 3-5 generic activity steps (e.g. "Researching your market", "Building the strategy document", "Writing high-converting ad copy", "Generating the ad creative").
@@ -98,7 +100,11 @@ After the user proceeds (or 10s elapses), run live web research before proposing
 - Ground every claim, keyword cluster, and benchmark in the research findings. NEVER hallucinate benchmarks.
 
 5. EXECUTION BLUEPRINT (proposePlan):
-Synthesize the research into an execution blueprint via proposePlan. The blueprint is the user's build sheet — they open Google Ads Manager and follow it line by line. It MUST follow this exact structure:
+Synthesize the research into an execution blueprint via proposePlan. The blueprint is the user's build sheet — they open Google Ads Manager and follow it line by line.
+
+Use the canonical 7-section blueprint as the DEFAULT structure, but TAILOR it to the user's actual business. Drop or rename sections when the user's situation makes them irrelevant (e.g. a local-services business doesn't need Detailed Targeting interest layers; a B2B SaaS doesn't need Locations beyond country-level).
+
+CANONICAL STRUCTURE (default, adapt as needed):
 
 # 1. Campaign Level Settings
 Open Google Ads Manager. Click "Create." Set up exactly as follows:
@@ -152,6 +158,13 @@ Each week: 3-5 bullet points with specific actions, specific numbers, specific t
 15-20 numbered items. Bold the CRITICAL ones (Advantage+, language, budget cap, conversion tracking, ad policy review).
 
 End every doc with **Go Live.** as the final line.
+
+FORMATTING RULES (these are what make the doc look like an actual build sheet, not consulting prose):
+- Every Setting|Value|Why table MUST have a |---|---|---| separator row. A missing separator breaks the renderer.
+- Every value must be EXACT (no "a modest budget" → use "₹1,000/day"; no "good volume" → use "12-16 conversions/day").
+- Every table cell that contains a pipe character must escape it as \\| or the table breaks.
+- Bold **CRITICAL:** callouts go immediately after the relevant section, not in a separate appendix.
+- Tables for settings, bullet lists for actions, prose only to explain WHY a setting exists.
 
 CRITICAL: Call proposePlan EXACTLY ONCE with the full markdownPlan. Do NOT dump the strategy as raw markdown text in the conversation. The tool renders a proper strategy document card with an Approve button — that's the only way the strategy should reach the user. Free-text prose after research is a UX bug.
 
@@ -214,9 +227,9 @@ const questionSchema = z.object({
           .describe("3-4 options per question, exactly one marked recommended"),
       }),
     )
-    .min(2)
-    .max(3)
-    .describe("2-3 strategic setup questions"),
+    .min(3)
+    .max(4)
+    .describe("3-4 strategic setup questions tailored to the user's specific business — at minimum cover budget, conversion action, and platform. If brand context is missing landing page or timing, ask those too."),
 });
 
 /** Replaces base64 creative data URLs in history with a short placeholder. */
@@ -726,10 +739,17 @@ export async function POST(req: Request) {
               issues.push(`Strategy bolded generic creative angles (e.g. "**Transformative Efficiency**"). Replace with specific, quantified angles.`);
             }
 
-            // 4. Check that landing page URL exists
-            const LANDING_URL = /(?:final\s*url|landing\s*page|landing\s*url)[:\s]+https?:\/\//i;
+            // 4. Check that any https?:// URL exists in the strategy. We
+            //    intentionally do NOT require it to be glued to a label
+            //    like "Final URL:" — the model writes URLs in many phrasings
+            //    ("Landing Page URL: Ensure https://x is set", "Final URL:
+            //    https://x", "URL: https://x", "…goes to https://x"). The
+            //    earlier regex required label + colon + URL on the same line
+            //    and rejected valid strategies. Match any URL anywhere in
+            //    the doc instead.
+            const LANDING_URL = /https?:\/\/[^\s)<>\]]+/i;
             if (!LANDING_URL.test(mdRaw) && md.length > 500) {
-              issues.push(`No landing page URL found in the strategy. Always include a specific destination URL.`);
+              issues.push(`No landing page URL found in the strategy. Include a specific https://... destination URL anywhere in the document (e.g. "Final URL: https://example.com" or "Landing Page: https://example.com/contact").`);
             }
 
             // 5. Markdown table structural check — every "| a | b | c |" header

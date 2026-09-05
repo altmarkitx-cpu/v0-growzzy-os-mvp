@@ -50,7 +50,7 @@ export function buildArtifactMarkdown(data: ArtifactData): string {
   if (data.rawMarkdown) return data.rawMarkdown;
 
   const brand = data.brandName || "Campaign";
-  const platform = data.platform || "Multi-Channel";
+  const platform = data.platform || "Google Ads";
   const offer = data.offer || "Core Proposition";
   const target = data.targetAudience || "Target ICP";
   const fullTitle = formatArtifactTitle(brand, data.title);
