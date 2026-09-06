@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   loadBrand,
@@ -641,8 +642,16 @@ export function AgentChat({ threadId = "growzzy-agent" }: AgentChatProps) {
     </Conversation>
   ) : (
     <div className="flex flex-1 flex-col items-center justify-center px-4">
-      <div className="mb-5 h-11 w-11 rounded-xl bg-black text-white flex items-center justify-center font-black text-lg shadow-sm">
-        G<span className="text-[#1F57F5] text-xs -mt-2">7</span>
+      <div className="mb-5 flex items-center justify-center">
+        <Image
+          src="/growzzy-logo.png"
+          alt="Growzzy OS"
+          width={48}
+          height={48}
+          className="h-12 w-12 object-contain"
+          priority
+          unoptimized
+        />
       </div>
       <h1 className="text-[34px] font-semibold tracking-tight text-foreground">
         Hello, {greetingName}
@@ -1355,7 +1364,7 @@ function PlanCard({
       {decided && output?.approved === false && (
         <div className="flex items-center justify-between pt-1 px-1">
           <p className="text-[12px] text-muted-foreground">
-            Review this strategic architecture. Click below to resubmit after fixing the issues above.
+            Review this strategic architecture. Click below to ask the agent to revise it.
           </p>
           <Button
             className="gap-1.5 bg-[#1F57F5] hover:bg-[#1845C4] text-white rounded-full px-5 text-[13px] font-medium shadow-sm cursor-pointer"
@@ -1363,12 +1372,16 @@ function PlanCard({
               addToolResult({
                 tool: "proposePlan",
                 toolCallId: part.toolCallId,
-                output: { approved: true },
+                output: {
+                  approved: false,
+                  userAction: "revise",
+                  message: "User asked to revise. Address all listed issues and call proposePlan again with a corrected strategy.",
+                },
               })
             }
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Resubmit
+            Revise strategy
           </Button>
         </div>
       )}
