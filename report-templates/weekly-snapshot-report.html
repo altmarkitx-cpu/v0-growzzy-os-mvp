@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Growzzy Weekly Snapshot</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f3f6fb; color: #0f172a; font-family: Inter, Arial, sans-serif; }
+    .page { width: 1200px; min-height: 860px; margin: 0 auto; padding: 42px; background: #ffffff; }
+    .top { display: flex; justify-content: space-between; gap: 32px; border-bottom: 1px solid #dbe5f1; padding-bottom: 30px; }
+    .brand { display: flex; align-items: center; gap: 12px; color: #475569; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .logo { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: #2457f5; color: white; font-size: 20px; font-weight: 900; }
+    h1 { margin: 18px 0 0; font-size: 56px; line-height: .95; letter-spacing: -.04em; }
+    .meta { min-width: 260px; text-align: right; color: #64748b; font-size: 12px; line-height: 1.8; }
+    .meta strong { display: block; color: #0f172a; font-size: 18px; }
+    .label { color: #64748b; font-size: 11px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .empty { margin-top: 26px; min-height: 430px; display: grid; place-items: center; text-align: center; border: 1px dashed #b9c8dc; border-radius: 18px; background: #f8fbff; padding: 56px; }
+    .empty h2 { margin: 0 0 10px; font-size: 26px; }
+    .empty p { max-width: 640px; margin: 0 auto; color: #64748b; line-height: 1.7; }
+    .summary { margin-top: 26px; padding: 24px; border-radius: 18px; background: #0f172a; color: white; }
+    .summary .label, .summary p { color: #dbeafe; }
+    .summary p { margin: 12px 0 0; font-size: 15px; line-height: 1.75; }
+    .headline { margin-top: 18px; padding: 22px; border-radius: 18px; background: #eef4ff; border: 1px solid #c7d8f7; color: #0f172a; }
+    .headline .label { color: #2457f5; }
+    .headline p { margin: 8px 0 0; font-size: 18px; font-weight: 700; line-height: 1.4; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px; }
+    .kpi { min-height: 132px; padding: 18px; border: 1px solid #dbe5f1; border-radius: 18px; background: #f8fbff; }
+    .value { margin-top: 16px; font-size: 34px; font-weight: 900; letter-spacing: -.03em; }
+    .delta-up { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #d6f4e0; color: #166534; font-size: 11px; font-weight: 800; }
+    .delta-down { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #fde2e1; color: #991b1b; font-size: 11px; font-weight: 800; }
+    .delta-flat { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #e2e8f0; color: #475569; font-size: 11px; font-weight: 800; }
+    .sub { margin-top: 8px; color: #64748b; font-size: 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+    .panel { padding: 22px; border: 1px solid #dbe5f1; border-radius: 18px; background: #ffffff; }
+    h2 { margin: 0 0 14px; color: #0f172a; font-size: 16px; letter-spacing: -.01em; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { padding: 10px 8px; text-align: left; color: #64748b; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; border-bottom: 2px solid #0f172a; }
+    td { padding: 13px 8px; border-bottom: 1px solid #e6edf6; vertical-align: top; }
+    .right { text-align: right; }
+    .pill { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; background: #e8f0ff; color: #2457f5; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+    .footer { margin-top: 30px; display: flex; justify-content: space-between; color: #94a3b8; font-size: 11px; border-top: 1px solid #dbe5f1; padding-top: 16px; }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="top">
+      <div>
+        <div class="brand"><span class="logo">G</span> Growzzy OS verified report</div>
+        <h1>Weekly<br />Snapshot</h1>
+      </div>
+      <aside class="meta">
+        <strong>{{clientName}}</strong>
+        Week of {{reportWeek}}<br />
+        Report {{reportId}}<br />
+        Generated {{generatedDate}}
+      </aside>
+    </header>
+
+    {{^hasCampaignData}}
+      <section class="empty">
+        <div>
+          <h2>No verified campaign data yet</h2>
+          <p>{{executiveSummary}}</p>
+        </div>
+      </section>
+    {{/hasCampaignData}}
+
+    {{#hasCampaignData}}
+      <section class="headline">
+        <div class="label">This week's headline</div>
+        <p>{{headline}}</p>
+      </section>
+
+      <section class="summary">
+        <div class="label">Executive summary</div>
+        <p>{{executiveSummary}}</p>
+      </section>
+
+      <section class="kpis">
+        <div class="kpi"><div class="label">This week spend</div><div class="value">{{totalSpend}}<span class="delta-{{spendDeltaDirection}}">{{spendDelta}}</span></div><div class="sub">vs prior 7 days</div></div>
+        <div class="kpi"><div class="label">Conversions</div><div class="value">{{totalConversions}}<span class="delta-{{conversionsDeltaDirection}}">{{conversionsDelta}}</span></div><div class="sub">vs prior 7 days</div></div>
+        <div class="kpi"><div class="label">CTR</div><div class="value">{{averageCtr}}<span class="delta-{{ctrDeltaDirection}}">{{ctrDelta}}</span></div><div class="sub">7-day average</div></div>
+        <div class="kpi"><div class="label">CPA</div><div class="value">{{averageCpa}}<span class="delta-{{cpaDeltaDirection}}">{{cpaDelta}}</span></div><div class="sub">7-day average</div></div>
+      </section>
+
+      <section class="grid">
+        <div class="panel">
+          <h2>Top movers this week</h2>
+          <table>
+            <thead><tr><th>Campaign</th><th class="right">Spend</th><th class="right">Conv.</th><th class="right">CPA</th><th class="right">Δ</th></tr></thead>
+            <tbody>
+              {{#topMovers}}
+                <tr>
+                  <td><strong>{{name}}</strong></td>
+                  <td class="right">{{spend}}</td>
+                  <td class="right">{{conversions}}</td>
+                  <td class="right">{{cpa}}</td>
+                  <td class="right"><span class="delta-{{direction}}">{{deltaLabel}}</span></td>
+                </tr>
+              {{/topMovers}}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <h2>Watch-list</h2>
+          {{#watchList}}
+            <div style="padding: 12px 0; border-top: 1px solid #e6edf6;">
+              <strong style="font-size: 14px;">{{title}}</strong>
+              <div class="sub" style="margin-top: 4px;">{{reason}}</div>
+            </div>
+          {{/watchList}}
+        </div>
+      </section>
+    {{/hasCampaignData}}
+
+    <footer class="footer"><span>Growzzy OS</span><span>Verified connected-platform data only</span></footer>
+  </main>
+</body>
+</html>

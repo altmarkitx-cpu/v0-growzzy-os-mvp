@@ -5,7 +5,7 @@ import { UTILITY_MODEL } from "@/lib/ai-utility"
 import { prisma } from "@/lib/prisma"
 import { verifiedMetricCampaignWhere } from "@/lib/data-trust"
 
-export const REPORT_TYPES = ["monthly-performance", "campaign-efficiency"] as const
+export const REPORT_TYPES = ["monthly-performance", "campaign-efficiency", "weekly-snapshot"] as const
 
 export type ReportType = (typeof REPORT_TYPES)[number]
 
@@ -42,6 +42,12 @@ export const REPORT_TEMPLATES: TemplateDefinition[] = [
     name: "Campaign Efficiency Review",
     description: "Efficiency review using verified CTR, CPC, CPM, CPA, conversion rate, and benchmark gaps.",
     filename: "campaign-efficiency-report.html",
+  },
+  {
+    id: "weekly-snapshot",
+    name: "Weekly Snapshot",
+    description: "Last-7-days vs prior-7-days deltas, top movers, and a single watch-list action for quick weekly check-ins.",
+    filename: "weekly-snapshot-report.html",
   },
 ]
 
@@ -529,6 +535,106 @@ export async function buildReportData(input: ReportBuildInput) {
     cpa: formatCurrency(avgCpaNumber),
   }
 
+  // Weekly-snapshot fields — computed only when the weekly-snapshot report
+  // type is requested. These are week-over-week deltas, a headline line, and
+  // the top movers + watch-list the template renders.
+  const weekStart = new Date(end.getTime() - 6 * 24 * 60 * 60 * 1000)
+  const weekEnd = end
+  const priorWeekStart = new Date(weekStart.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const priorWeekEnd = new Date(weekStart.getTime() - 1)
+  const weekMetrics = dailyMetrics.filter((m) => m.metricDate >= weekStart && m.metricDate <= weekEnd)
+  const priorMetrics = dailyMetrics.filter((m) => m.metricDate >= priorWeekStart && m.metricDate <= priorWeekEnd)
+  const sum = (metrics: typeof dailyMetrics, key: keyof typeof dailyMetrics[0]) =>
+    metrics.reduce((acc, m) => acc + safeNumber(m[key]), 0)
+  const weekSpend = sum(weekMetrics, "spend")
+  const weekConversions = sum(weekMetrics, "conversions")
+  const weekClicks = sum(weekMetrics, "clicks")
+  const weekImpressions = sum(weekMetrics, "impressions")
+  const weekCpa = weekConversions > 0 ? weekSpend / weekConversions : 0
+  const weekCtr = weekImpressions > 0 ? (weekClicks / weekImpressions) * 100 : 0
+  const priorSpend = sum(priorMetrics, "spend")
+  const priorConversions = sum(priorMetrics, "conversions")
+  const priorClicks = sum(priorMetrics, "clicks")
+  const priorImpressions = sum(priorMetrics, "impressions")
+  const priorCpa = priorConversions > 0 ? priorSpend / priorConversions : 0
+  const priorCtr = priorImpressions > 0 ? (priorClicks / priorImpressions) * 100 : 0
+
+  const delta = (current: number, previous: number) => {
+    if (previous === 0 && current === 0) return { label: "No change", direction: "flat", pct: 0 }
+    if (previous === 0) return { label: `+${formatCompactCurrency(current)}`, direction: "up", pct: 100 }
+    const pct = ((current - previous) / previous) * 100
+    const direction = pct > 0 ? "up" : pct < 0 ? "down" : "flat"
+    const label = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`
+    return { label, direction, pct }
+  }
+  const spendDeltaInfo = delta(weekSpend, priorSpend)
+  const conversionsDeltaInfo = delta(weekConversions, priorConversions)
+  const ctrDeltaInfo = delta(weekCtr, priorCtr)
+  const cpaDeltaInfo = delta(weekCpa, priorCpa)
+
+  const campaignWeekRows = campaigns.map((campaign) => {
+    const cMetrics = dailyMetrics.filter((m) => m.campaignId === campaign.id)
+    const wMetrics = cMetrics.filter((m) => m.metricDate >= weekStart && m.metricDate <= weekEnd)
+    const pMetrics = cMetrics.filter((m) => m.metricDate >= priorWeekStart && m.metricDate <= priorWeekEnd)
+    const wSpend = sum(wMetrics, "spend")
+    const wConversions = sum(wMetrics, "conversions")
+    const pSpend = sum(pMetrics, "spend")
+    const pConversions = sum(pMetrics, "conversions")
+    const wCpa = wConversions > 0 ? wSpend / wConversions : 0
+    const pCpa = pConversions > 0 ? pSpend / pConversions : 0
+    const convDelta = delta(wConversions, pConversions)
+    const spendDeltaVal = delta(wSpend, pSpend)
+    const isMover = Math.abs(convDelta.pct) >= 10 || Math.abs(spendDeltaVal.pct) >= 20
+    return {
+      id: campaign.id,
+      name: campaign.name,
+      spend: formatCurrency(wSpend),
+      conversions: wConversions.toLocaleString(),
+      cpa: formatCurrency(wCpa),
+      deltaLabel: convDelta.label,
+      direction: convDelta.direction,
+      isMover,
+      convDeltaPct: convDelta.pct,
+      spendDeltaPct: spendDeltaVal.pct,
+      wSpendRaw: wSpend,
+      wConversionsRaw: wConversions,
+    }
+  })
+
+  const topMovers = [...campaignWeekRows]
+    .filter((r) => r.isMover && r.direction === "up")
+    .sort((a, b) => b.wConversionsRaw - a.wConversionsRaw)
+    .slice(0, 8)
+  const watchList = [...campaignWeekRows]
+    .filter((r) => r.isMover && r.direction === "down")
+    .sort((a, b) => a.wConversionsRaw - b.wConversionsRaw)
+    .slice(0, 5)
+    .map((r) => ({
+      title: `${r.name} — conversions down`,
+      reason: `Conversions dropped ${r.deltaLabel} vs the prior week at ${r.spend} spend. Review audience, creative, and bid strategy before the drop compounds.`,
+    }))
+
+  const headline = watchList.length > 0
+    ? `${watchList.length} campaign${watchList.length > 1 ? "s" : ""} lost conversions this week — start with ${watchList[0].title}.`
+    : topMovers.length > 0
+      ? `${topMovers.length} campaign${topMovers.length > 1 ? "s" : ""} gained conversions this week — scale the winners.`
+      : `This week's spend was ${formatCurrency(weekSpend)} with ${weekConversions.toLocaleString()} conversions at ${formatCurrency(weekCpa)} CPA.`
+
+  const weeklyData = {
+    reportWeek: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(weekStart) + " – " + new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(weekEnd),
+    headline,
+    spendDelta: spendDeltaInfo.label,
+    spendDeltaDirection: spendDeltaInfo.direction,
+    conversionsDelta: conversionsDeltaInfo.label,
+    conversionsDeltaDirection: conversionsDeltaInfo.direction,
+    ctrDelta: ctrDeltaInfo.label,
+    ctrDeltaDirection: ctrDeltaInfo.direction,
+    cpaDelta: cpaDeltaInfo.label,
+    cpaDeltaDirection: cpaDeltaInfo.direction,
+    topMovers,
+    watchList,
+  }
+
   if (!campaigns.length) {
     return {
       ...baseData,
@@ -549,6 +655,7 @@ export async function buildReportData(input: ReportBuildInput) {
 
   return {
     ...baseData,
+    ...(input.type === "weekly-snapshot" ? weeklyData : {}),
     executiveSummary: narrative.executiveSummary,
     recommendations: narrative.recommendations,
   }

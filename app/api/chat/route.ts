@@ -653,20 +653,20 @@ export async function POST(req: Request) {
 
         askUser: tool({
           description:
-            "Ask the user 2-3 strategic setup questions as a clickable card-based UI. ALWAYS use this tool — never write questions as plain text. Each question gets 3-4 options with category labels (e.g. 'Inbound Qualified Leads'), short benefit descriptions, and exactly ONE option marked recommended:true.",
+            "Ask the user strategic setup questions as a clickable card-based UI. ALWAYS use this tool — never write questions as plain text. Derive each question from what the user's message is missing (audience, geography, budget, conversion action, offer, urgency, competitive context, etc.). Each question gets 3-4 options tailored to the user's business; the model picks the option it would recommend based on the brand context and reasoning it can show in the description. Exactly ONE option per question should be marked recommended:true.",
           inputSchema: questionSchema,
         }),
 
         previewExecution: tool({
           description:
-            "MANDATORY: After the user answers askUser, call this tool BEFORE research to show the user an Execution Plan card. It lists 3-5 upcoming activities (e.g. 'Researching your market', 'Building the strategy document', 'Writing the ad copy', 'Generating the ad creative'). The card has a 'Proceed with plan' button and a 10s auto-proceed countdown. Use PLAIN ACTIVITY LABELS — never role names like 'Performance Marketing' or 'Creative Director'. The model only continues after the user clicks Proceed or the countdown fires.",
+            "MANDATORY: After the user answers askUser, call this tool BEFORE research to show the user an Execution Plan card. The card lists 3-5 upcoming activities that are about to run for THIS specific campaign. Derive the activity labels from the actual work the model is about to do (e.g. if the campaign is a B2B SaaS lead-gen campaign, the activities might be 'Analyzing your B2B SaaS competitors', 'Building keyword lists for enterprise buyers', 'Drafting your LinkedIn-style direct response copy'). The card has a 'Proceed with plan' button and a 10s auto-proceed countdown. The model only continues after the user clicks Proceed or the countdown fires.",
           inputSchema: z.object({
-            title: z.string().describe("Short plan title, e.g. 'Lead-gen campaign build plan'"),
-            summary: z.string().describe("One-line summary, e.g. 'Research, strategy, copy, and creative for the Meta campaign'"),
+            title: z.string().describe("Short plan title specific to the campaign, e.g. the campaign's objective plus channel"),
+            summary: z.string().describe("One-line summary specific to what this run will produce"),
             steps: z
               .array(
                 z.object({
-                  activity: z.string().describe("Generic activity label, e.g. 'Researching your market'. NEVER use role names — use plain activity verbs."),
+                  activity: z.string().describe("Activity label specific to this campaign. Derive from the work being done — do not copy a fixed template."),
                   description: z.string().describe("One-line description of what this step produces."),
                 }),
               )

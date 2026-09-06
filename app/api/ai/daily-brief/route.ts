@@ -55,31 +55,40 @@ async function loadGoogleCampaigns(userId: string, workspaceId: string) {
 }
 
 async function maybePolishSummary(brief: ReturnType<typeof buildDailyBriefFromCampaigns>) {
-  if (!process.env.OPENAI_API_KEY || !brief.recommendations.length) return brief.summary
+  // The old version passed the deterministic summary to the LLM and asked it
+  // to "rewrite" it. The LLM can only add noise — same sentence, slightly
+  // reworded. Instead, pass the RAW facts and let the LLM generate a real
+  // summary. This makes the output genuinely variable (different campaigns
+  // → different briefs) instead of a fixed sentence with numbers swapped in.
+  if (!process.env.OPENAI_API_KEY) return brief.summary
 
   try {
     const completion = await openai.chat.completions.create({
       model: UTILITY_MODEL,
-      temperature: 0.2,
+      temperature: 0.4,
       messages: [
         {
           role: "system",
           content:
-            "You are GROWZZY OS, a concise AI media buyer. Rewrite the daily brief summary using only the provided facts. Do not add metrics, campaigns, or claims that are not present.",
+            "You are GROWZZY OS, a concise AI media buyer. Write a daily brief summary from the raw campaign data below. " +
+            "Write it as if you are speaking to the account owner in one short paragraph. " +
+            "Name the campaigns that matter, state the specific spend/conversion numbers, and lead with the single most important action. " +
+            "Do NOT use bullet points. Do NOT invent metrics. If there is nothing worth acting on, say so plainly.",
         },
         {
           role: "user",
           content: JSON.stringify({
-            summary: brief.summary,
             accountHealth: brief.accountHealth,
             moneyWasted: brief.moneyWasted,
             creativeFatigueAlerts: brief.creativeFatigueAlerts,
-            recommendations: brief.recommendations.slice(0, 3),
+            recommendations: brief.recommendations.slice(0, 5),
           }),
         },
       ],
     })
-    return completion.choices[0]?.message?.content?.trim() || brief.summary
+    const polished = completion.choices[0]?.message?.content?.trim()
+    if (polished && polished.length > 40 && polished.length < 1200) return polished
+    return brief.summary
   } catch (error: any) {
     log("warn", "api/ai/daily-brief", "AI summary polish failed; using deterministic summary", { message: error?.message })
     return brief.summary
