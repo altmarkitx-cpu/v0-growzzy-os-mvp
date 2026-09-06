@@ -31,7 +31,18 @@ export async function generateAIInsights(metrics: ReportMetrics): Promise<AIRepo
     .map(([platform, data]) => `${platform}: $${data.spend.toFixed(2)} spend, $${data.revenue.toFixed(2)} revenue, ${data.roas.toFixed(2)}x ROAS`)
     .join("\n");
 
-  const prompt = `You are an expert marketing performance analyst. Analyze this marketing data and provide EXACTLY the following JSON response format with no additional text:
+  // Adaptive benchmark context based on platform
+  const isMeta = Object.keys(metrics.platformBreakdown).some((p) => /meta|facebook|instagram/i.test(p))
+  const isGoogle = Object.keys(metrics.platformBreakdown).some((p) => /google|search/i.test(p))
+  const benchmarkContext = isMeta && isGoogle
+    ? "Compare against Google search benchmarks (CTR ~3-5%, CPC ~$1-3) and Meta benchmarks (CTR ~0.5-1.5%, CPC ~$0.5-2)."
+    : isMeta
+      ? "Compare against Meta benchmarks: CTR ~0.5-1.5%, CPC ~$0.50-2.00, CPA varies by objective."
+      : "Compare against Google search benchmarks: CTR ~3-5%, CPC ~$1-3, CPA varies by industry."
+
+  const prompt = `You are an expert marketing performance analyst. Analyze this marketing data and provide EXACTLY the following JSON response format with no additional text.
+
+${benchmarkContext}
 
 OVERALL METRICS:
 - Date Range: ${metrics.dateRange.from.toLocaleDateString()} to ${metrics.dateRange.to.toLocaleDateString()}

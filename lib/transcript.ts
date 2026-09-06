@@ -35,7 +35,7 @@ export function buildTranscript(
   const stamps = messages.map((m) => m.at).filter(Boolean) as string[];
 
   const lines: string[] = [
-    `# ${opts.title ?? "Growzzy chat transcript"}`,
+    `# ${opts.title ?? "Chat transcript"}`,
     "",
     `- Generated: ${generated.toISOString().replace("T", " ").slice(0, 19)} UTC`,
     `- Turns: ${messages.length}`,
@@ -55,7 +55,7 @@ export function buildTranscript(
       .join("\n\n");
 
     if (m.role === "user" && text) lines.push(`## You${stamp(m.at)}`, "", text, "");
-    else if (m.role === "assistant" && text) lines.push(`## Growzzy${stamp(m.at)}`, "", text, "");
+    else if (m.role === "assistant" && text) lines.push(`## AI Assistant${stamp(m.at)}`, "", text, "");
 
     parts.forEach((p) => {
       const name = toolName(p.type);
@@ -69,7 +69,7 @@ export function buildTranscript(
       }
 
       if (name === "askUser") {
-        lines.push(`### [QUESTIONS] Growzzy asked${stamp(m.at)}`, "");
+        lines.push(`### [QUESTIONS] AI asked${stamp(m.at)}`, "");
         lines.push(
           fmtList(input.questions, (q: { question?: string; why?: string }) =>
             `- **${q.question ?? ""}** — ${q.why ?? ""}`,

@@ -221,15 +221,15 @@ export default function AdsManagerPage() {
   // Cell renderer helper for dynamically chosen metrics
   const renderCell = (colId: string, c: Campaign) => {
     const spend = Number(c.spend || 0)
-    const clicks = Math.round(Number(c.clicks || 0))
-    const convs = Math.round(Number(c.conversions || 0))
-    const impr = clicks > 0 ? clicks * 32 : 1250
+    const clicks = Number(c.clicks || 0)
+    const convs = Number(c.conversions || 0)
+    const impr = Number(c.impressions || 0)
 
     switch (colId) {
       case "campaign":
         return <span className="font-medium text-[#111827]">{c.name}</span>
       case "budget":
-        return <span className="text-[#374151] tabular">{money(c.dailyBudget || 50)}/day</span>
+        return <span className="text-[#374151] tabular">{c.dailyBudget ? `${money(c.dailyBudget)}/day` : "—"}</span>
       case "status": {
         const pill = statusPill(c.liveStatus || c.status)
         return (
@@ -245,19 +245,19 @@ export default function AdsManagerPage() {
       }
       case "cost":
       case "spend":
-        return <span className="text-[#374151] tabular">{money(spend)}</span>
+        return <span className="text-[#374151] tabular">{spend > 0 ? money(spend) : "—"}</span>
       case "clicks":
-        return <span className="text-[#374151] tabular">{clicks}</span>
+        return <span className="text-[#374151] tabular">{clicks > 0 ? Math.round(clicks).toLocaleString() : "—"}</span>
       case "impr":
       case "impressions":
-        return <span className="text-[#374151] tabular">{impr.toLocaleString()}</span>
+        return <span className="text-[#374151] tabular">{impr > 0 ? impr.toLocaleString() : "—"}</span>
       case "conversions":
       case "conv":
-        return <span className="text-[#374151] tabular">{convs}</span>
+        return <span className="text-[#374151] tabular">{convs > 0 ? Math.round(convs).toLocaleString() : "—"}</span>
       case "avg_cpc":
         return (
           <span className="text-[#374151] tabular">
-            {clicks > 0 ? money(spend / clicks) : "$1.24"}
+            {clicks > 0 ? money(spend / clicks) : "—"}
           </span>
         )
       case "cost_conv":
@@ -265,44 +265,48 @@ export default function AdsManagerPage() {
       case "avg_target_cpa":
         return (
           <span className="text-[#374151] tabular">
-            {c.cpa ? money(c.cpa) : convs > 0 ? money(spend / convs) : "—"}
+            {c.cpa && c.cpa > 0 ? money(c.cpa) : convs > 0 ? money(spend / convs) : "—"}
           </span>
         )
       case "avg_target_roas":
       case "roas":
         return (
           <span className="text-[#374151] tabular">
-            {c.roas ? c.roas.toFixed(2) + "x" : "3.42x"}
+            {c.roas && c.roas > 0 ? c.roas.toFixed(2) + "x" : "—"}
           </span>
         )
       case "ctr":
-      case "viewable_ctr":
+      case "viewable_ctr": {
+        const ctr = impr > 0 && clicks > 0 ? (clicks / impr) * 100 : 0
         return (
           <span className="text-[#374151] tabular">
-            {impr > 0 ? ((clicks / impr) * 100).toFixed(2) + "%" : "2.85%"}
+            {ctr > 0 ? ctr.toFixed(2) + "%" : "—"}
           </span>
         )
-      case "conv_rate":
+      }
+      case "conv_rate": {
+        const rate = clicks > 0 && convs > 0 ? (convs / clicks) * 100 : 0
         return (
           <span className="text-[#374151] tabular">
-            {clicks > 0 ? ((convs / clicks) * 100).toFixed(2) + "%" : "4.10%"}
+            {rate > 0 ? rate.toFixed(2) + "%" : "—"}
           </span>
         )
+      }
       case "optimization_score":
-        return <span className="text-emerald-600 font-semibold tabular">94.2%</span>
+        return <span className="text-[#6B7280] tabular">—</span>
       case "bid_strategy_type":
-        return <span className="text-[#6B7280]">Target CPA</span>
+        return <span className="text-[#6B7280]">—</span>
       case "interactions":
-        return <span className="text-[#374151] tabular">{(clicks * 1.15).toFixed(0)}</span>
+        return <span className="text-[#374151] tabular">{clicks > 0 ? Math.round(clicks).toLocaleString() : "—"}</span>
       case "interaction_rate":
-        return <span className="text-[#374151] tabular">3.12%</span>
+        return <span className="text-[#6B7280] tabular">—</span>
       case "results":
       case "purchase":
       case "signup":
       case "submit_lead_form":
-        return <span className="text-[#374151] tabular">{convs}</span>
+        return <span className="text-[#374151] tabular">{convs > 0 ? Math.round(convs).toLocaleString() : "—"}</span>
       case "ad_strength_details":
-        return <span className="text-emerald-600 font-medium">Excellent</span>
+        return <span className="text-[#6B7280]">—</span>
       default:
         return <span className="text-[#6B7280] tabular">—</span>
     }

@@ -14,7 +14,7 @@ function slugify(value: string) {
 }
 
 export async function ensureDefaultWorkspace(userId: string, name?: string | null) {
-  const base = slugify(name || "Growzzy Workspace") || "growzzy-workspace"
+  const base = slugify(name || "My Workspace") || "my-workspace"
   const slug = `${base.slice(0, 20)}-${userId.toLowerCase()}`
 
   try {
@@ -34,7 +34,7 @@ export async function ensureDefaultWorkspace(userId: string, name?: string | nul
         logo: true,
       },
       create: {
-        name: name || "Growzzy Workspace",
+        name: name || "My Workspace",
         slug,
         ownerId: userId,
         defaultForOwnerId: userId,

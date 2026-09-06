@@ -18,7 +18,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } catch {
     throw {
       status: 0,
-      message: "Couldn't reach Growzzy — check your connection and try again.",
+      message: "Couldn't reach the service — check your connection and try again.",
     } satisfies ApiError;
   }
   if (!res.ok) {

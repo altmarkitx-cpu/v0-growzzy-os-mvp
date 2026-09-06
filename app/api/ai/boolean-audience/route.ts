@@ -6,6 +6,7 @@ import { rateLimitPolicy, rateLimitResponse } from "@/lib/rate-limit"
 import { getRequestWorkspaceId } from "@/lib/workspace"
 import { getBusinessContextForWorkspace } from "@/lib/business-context"
 import { cachedUtilityCompletion } from "@/lib/ai-utility"
+import { getActiveAdAccountScope } from "@/lib/account-scope"
 
 const BooleanAudienceSchema = z.object({
   query: z.string().min(3).max(500),
@@ -21,31 +22,42 @@ export async function POST(req: NextRequest) {
 
   const input = BooleanAudienceSchema.parse(await req.json())
   const workspaceId = await getRequestWorkspaceId(userId, req)
+  const scope = await getActiveAdAccountScope(userId, workspaceId)
   const businessContext = await getBusinessContextForWorkspace(workspaceId)
 
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ ok: false, error: "Boolean audience search is unavailable because OPENAI_API_KEY is not configured." }, { status: 503 })
   }
 
-  const content = await cachedUtilityCompletion({
-    route: "/api/ai/boolean-audience",
-    operation: "boolean-audience",
-    userId,
-    workspaceId,
-    input: { query: input.query, businessContext },
-    json: true,
-    messages: [
-      {
-        role: "system",
-        content: `Google Ads has no native "boolean audience query" concept — it targets via search keywords, not boolean people-search like LinkedIn Recruiter. Translate the user's boolean-style audience description (using AND/OR/NOT, age:, location: operators) into a real, launch-ready Google Search Ads keyword set that would actually reach that audience.
+  const isGoogle = scope?.platform?.toUpperCase().includes("GOOGLE") ?? false
+  const isMeta = scope?.platform?.toUpperCase().includes("META") ?? false
+  const platformLabel = isMeta ? "Meta Ads" : isGoogle ? "Google Ads" : "paid search/social"
+  const systemContent = isMeta
+    ? `Translate the user's boolean-style audience description (using AND/OR/NOT, age:, location:, interest: operators) into a real, launch-ready Meta Ads audience specification using their Detailed Targeting and Custom Audience concepts.
+Rules:
+- Recommend detailed targeting interests, behaviors, and demographics that would reach this audience
+- Suggest lookalike or custom audience seed specifications if relevant
+- Propose exclusions to narrow the audience
+- Never fabricate audience size estimates
+Return ONLY JSON: {"interpretation": "one paragraph explaining how the boolean query maps to Meta targeting intent", "targeting": [{"type": "interest"|"behavior"|"demographic"|"lookalike", "value": "...", "rationale": "..."}], "exclusions": ["..."]}`
+    : `Google Ads has no native "boolean audience query" concept — it targets via search keywords, not boolean people-search like LinkedIn Recruiter. Translate the user's boolean-style audience description (using AND/OR/NOT, age:, location: operators) into a real, launch-ready Google Search Ads keyword set that would actually reach that audience.
 Rules:
 - Only propose keywords a real searcher in that audience would plausibly type
 - Assign each keyword a matchType of BROAD, PHRASE, or EXACT
 - Propose negative keywords to exclude clearly irrelevant traffic implied by NOT clauses or by the audience description
 - Explain in one sentence how each operator in the query was interpreted
 - Never fabricate demographic reach numbers or platform capabilities Google Ads doesn't have
-Return ONLY JSON: {"interpretation": "one paragraph explaining how the boolean query maps to Google Search intent", "keywords": [{"text": "...", "matchType": "BROAD|PHRASE|EXACT", "rationale": "..."}], "negativeKeywords": ["..."]}`,
-      },
+Return ONLY JSON: {"interpretation": "one paragraph explaining how the boolean query maps to Google Search intent", "keywords": [{"text": "...", "matchType": "BROAD|PHRASE|EXACT", "rationale": "..."}], "negativeKeywords": ["..."]}`
+
+  const content = await cachedUtilityCompletion({
+    route: "/api/ai/boolean-audience",
+    operation: "boolean-audience",
+    userId,
+    workspaceId,
+    input: { query: input.query, businessContext, platform: scope?.platform || "UNKNOWN" },
+    json: true,
+    messages: [
+      { role: "system", content: systemContent },
       { role: "user", content: `${input.query}${businessContext}` },
     ],
   })

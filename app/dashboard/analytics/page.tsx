@@ -338,7 +338,7 @@ export default function AnalyticsPage() {
             <EmptyState
               icon={<Sparkles className="h-5 w-5" />}
               title="Insights appear here"
-              description="Once your campaigns have data, Growzzy explains what's working and what to change — with the numbers to back it up."
+              description="Once your campaigns have data, insights will be shown here — with the numbers to back them up."
             />
           </SectionCard>
         </div>

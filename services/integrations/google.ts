@@ -161,7 +161,16 @@ function getGoogleClientSecret(): string {
 }
 
 function resolveRedirectUri(override?: string): string {
-  return (override || process.env.GOOGLE_REDIRECT_URI || "https://v0-growzzyos.vercel.app/api/auth/google/callback").trim()
+  if (override) return override.trim()
+  const envUri = process.env.GOOGLE_REDIRECT_URI?.trim()
+  if (envUri) return envUri
+  // Derive from NEXT_PUBLIC_APP_URL if set, otherwise let the callback
+  // detect the origin from the request headers dynamically.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")
+  if (appUrl) return `${appUrl}/api/auth/google/callback`
+  // No env override — the callback will use x-forwarded-proto/host headers
+  // to reconstruct the origin. Return empty string so callers handle gracefully.
+  return ""
 }
 
 function parseGoogleAdsErrorCodes(errorPayload: any): string[] {

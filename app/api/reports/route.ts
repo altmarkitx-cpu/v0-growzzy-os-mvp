@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { calculateReportMetrics } from '@/lib/report-metrics'
-import { generateAIInsights } from '@/lib/report-insights'
-import { generateActionPlan } from '@/lib/report-action-plan'
+import { generateAdaptiveReport } from '@/lib/adaptive-report'
 import { getRequestWorkspaceId, workspaceWhere } from '@/lib/workspace'
 import { resolveUserId } from '@/lib/resolve-user'
 import { log } from '@/lib/logger'
@@ -47,7 +45,7 @@ export async function GET(request: NextRequest) {
 }
 
 // ============================================
-// POST — Create report + generate data + AI summary
+// POST — Create report using the adaptive engine
 // ============================================
 export async function POST(request: NextRequest) {
   try {
@@ -68,8 +66,17 @@ export async function POST(request: NextRequest) {
     const start = new Date(startDate)
     const end = new Date(endDate)
 
-    const metrics = await calculateReportMetrics(userId, { from: start, to: end }, { workspaceId, adAccountId })
-    const platforms = Object.keys(metrics.platformBreakdown).map((platform) => platform.toUpperCase())
+    // Pull workspace industry for adaptive report shaping
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId || "" },
+      select: { industry: true, name: true },
+    }).catch(() => null)
+
+    // Pull user risk prefs for adaptive thresholds
+    const userSettings = await prisma.userSettings.findUnique({
+      where: { userId },
+      select: { riskLevel: true, targetRoas: true, primaryKpi: true },
+    }).catch(() => null)
 
     const report = await prisma.report.create({
       data: {
@@ -80,30 +87,37 @@ export async function POST(request: NextRequest) {
         type,
         startDate: start,
         endDate: end,
-        platforms,
+        platforms: [],
         schedule: schedule || null,
         config: config || null,
         status: 'generating',
       },
     })
 
-    // b. Generate AI Insights
-    const insights = await generateAIInsights(metrics)
+    // Generate using the adaptive engine with industry + risk context
+    const adaptiveResult = await generateAdaptiveReport({
+      userId,
+      workspaceId,
+      adAccountId,
+      startDate: start,
+      endDate: end,
+      type,
+      industry: workspace?.industry || null,
+      riskLevel: userSettings?.riskLevel || null,
+      targetRoas: userSettings?.targetRoas || null,
+      primaryKpi: userSettings?.primaryKpi || null,
+    }).catch((err: any) => {
+      log("error", "api/reports", "Adaptive report generation failed", { message: err?.message })
+      return null
+    })
 
-    // c. Generate Action Plan
-    const actionPlan = await generateActionPlan(metrics, insights)
-
-    // 3. Generate legacy AI summary for compatibility
-    const aiSummary = insights.wins.slice(0, 2).join(". ") + ". " + insights.concerns.slice(0, 1).join(". ");
-
-    // 4. Finalize report with all data
     const updated = await prisma.report.update({
       where: { id: report.id },
       data: {
-        metrics: metrics as any,
-        insights: insights as any,
-        recommendations: actionPlan as any,
-        aiSummary,
+        metrics: (adaptiveResult?.metrics || {}) as any,
+        insights: (adaptiveResult?.insights || {}) as any,
+        recommendations: (adaptiveResult?.recommendations || []) as any,
+        aiSummary: adaptiveResult?.executiveSummary || "Report generated from live synced data.",
         status: 'completed',
         lastRunAt: new Date(),
       },

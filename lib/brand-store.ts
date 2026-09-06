@@ -76,7 +76,7 @@ export const emptyBrand: BrandProfile = {
   keywords: [],
   creativeAngles: [],
   tone: "friendly",
-  palette: { name: "Growzzy", primary: "#1F57F5", accent: "#EAF0FE" },
+  palette: { name: "Blue", primary: "#1F57F5", accent: "#EAF0FE" },
   defaultLandingPage: "",
 };
 

@@ -11,7 +11,7 @@ export default function CampaignsError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[Growzzy] Campaigns error boundary caught:", error);
+    console.error("[Campaigns] Error boundary caught:", error);
   }, [error]);
 
   return (

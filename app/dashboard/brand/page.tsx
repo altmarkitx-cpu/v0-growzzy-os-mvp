@@ -30,8 +30,10 @@ import {
   type UserRole,
 } from "@/lib/brand-store";
 
+const PRODUCT_NAME = process.env.NEXT_PUBLIC_PRODUCT_NAME || "Growzzy OS";
+
 const palettes = [
-  { name: "Growzzy", primary: "#1F57F5", accent: "#EAF0FE" },
+  { name: PRODUCT_NAME.replace(" OS", ""), primary: "#1F57F5", accent: "#EAF0FE" },
   { name: "Ember", primary: "#F97316", accent: "#FEF0E6" },
   { name: "Forest", primary: "#059669", accent: "#E7F5EF" },
   { name: "Rose", primary: "#E11D48", accent: "#FCE7EC" },
@@ -172,7 +174,7 @@ export default function BrandPage() {
       setBrand(next);
       saveBrand(next);
       window.dispatchEvent(new Event("growzzy:brand-updated"));
-      toast.success(`Analysed ${next.businessName}. Growzzy now knows your business.`);
+      toast.success(`Analysed ${next.businessName}. ${PRODUCT_NAME} now knows your business.`);
     } catch (e) {
       toast.error((e as { message?: string })?.message ?? "Couldn't analyse that website.");
     } finally {
@@ -183,7 +185,7 @@ export default function BrandPage() {
   const save = () => {
     saveBrand(brand);
     window.dispatchEvent(new Event("growzzy:brand-updated"));
-    toast.success("Brand context saved. Growzzy uses it on every campaign.");
+    toast.success(`Brand context saved. ${PRODUCT_NAME} uses it on every campaign.`);
   };
 
   const exportReport = async () => {
@@ -231,7 +233,7 @@ export default function BrandPage() {
     pdf.text(`${brand.businessName} — Brand Research`, margin, y);
     y += 22;
     line(
-      `Prepared by Growzzy OS${brand.analyzedAt ? ` · Research updated ${new Date(brand.analyzedAt).toLocaleDateString()}` : ""}`,
+      `Prepared by ${PRODUCT_NAME}${brand.analyzedAt ? ` · Research updated ${new Date(brand.analyzedAt).toLocaleDateString()}` : ""}`,
       9,
       [90, 101, 119],
     );
@@ -277,7 +279,7 @@ export default function BrandPage() {
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         <PageHeader
           title="My Brand"
-          subtitle="Growzzy reads your live website so it never has to ask what your business is."
+          subtitle={`${PRODUCT_NAME} reads your live website so it never has to ask what your business is.`}
           actions={
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={exportReport} className="gap-1.5 cursor-pointer">
@@ -294,9 +296,9 @@ export default function BrandPage() {
 
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_380px]">
           <div className="space-y-6">
-            <SectionCard title="Who's using Growzzy?">
+            <SectionCard title="Who's using this?">
               <p className="text-[12px] text-muted-foreground mb-3">
-                Pick your role so Growzzy frames every answer for your specific job. This unlocks the full app for the right teams — founders see growth, marketing managers see execution, sales leads see pipeline.
+                Pick your role so {PRODUCT_NAME} frames every answer for your specific job. This unlocks the full app for the right teams — founders see growth, marketing managers see execution, sales leads see pipeline.
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {USER_ROLE_OPTIONS.map((r) => {
@@ -335,7 +337,7 @@ export default function BrandPage() {
               title="Your role"
             >
               <p className="mb-3 text-[12.5px] text-muted-foreground">
-                Growzzy tailors every answer to who is asking. Pick the role that best describes you and add a one-line note about what you own.
+                {PRODUCT_NAME} tailors every answer to who is asking. Pick the role that best describes you and add a one-line note about what you own.
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {USER_ROLE_OPTIONS.map((opt) => (
@@ -395,7 +397,7 @@ export default function BrandPage() {
                 </Button>
               </div>
               <p className="mt-2 text-[11.5px] leading-snug text-muted-foreground">
-                Growzzy reads your real pages, searches the live web for your category and
+                {PRODUCT_NAME} reads your real pages, searches the live web for your category and
                 competitors, then builds the brand context every campaign is written from.
               </p>
               {!ready && !analyzing && (
@@ -766,7 +768,7 @@ export default function BrandPage() {
                 </div>
               </div>
               <p className="mt-3 text-[11.5px] text-muted-foreground">
-                Growzzy only advertises on Google Ads and Meta Ads — this is how your ads will feel.
+                {PRODUCT_NAME} only advertises on Google Ads and Meta Ads — this is how your ads will feel.
               </p>
             </SectionCard>
 

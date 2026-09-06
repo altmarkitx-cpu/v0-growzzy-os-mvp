@@ -107,10 +107,22 @@ export async function POST(req: NextRequest) {
     }
 
     const averages = calculateAccountAverages(campaigns)
-    const analyzedCampaigns = analyzeCampaigns(campaigns, averages)
-    const ruleRecommendations = buildRuleRecommendations(campaigns, averages).map((rec) => enrichRecommendation(rec, campaigns))
-    const scoreData = calculateAuditScores(campaigns, averages)
-    const deterministicSummary = `Audited ${campaigns.length} Google campaigns with ${averages.avgRoas.toFixed(2)}x average ROAS, $${averages.avgCpc.toFixed(2)} CPC, ${averages.avgCtr.toFixed(2)}% CTR, and $${averages.totalSpend.toFixed(2)} spend. Found ${ruleRecommendations.length} rule-backed optimization opportunities from real synced data.`
+    const riskLevel = settings.riskLevel
+    const analyzedCampaigns = analyzeCampaigns(campaigns, averages, riskLevel)
+    const ruleRecommendations = buildRuleRecommendations(campaigns, averages, riskLevel).map((rec) => enrichRecommendation(rec, campaigns))
+    const scoreData = calculateAuditScores(campaigns, averages, riskLevel)
+
+    // Build dynamic benchmarks from the actual platforms present in campaign data
+    const platforms = [...new Set(campaigns.map((c) => c.platform).filter(Boolean))]
+    const isGoogle = platforms.some((p) => /google|search/i.test(p || ""))
+    const isMeta = platforms.some((p) => /meta|facebook|instagram/i.test(p || ""))
+    const benchmarkContext = isMeta && isGoogle
+      ? "Search/Display CTR: 3.17% | Social CTR: 0.90% | Display CTR: 0.46% | Avg CVR: 3.75% | Avg CPC $2.69 (search), $1.20 (social)"
+      : isMeta
+        ? "Social CTR: 0.90% | Avg CVR: 1.5% | Avg CPC $1.20 | Compare against Meta-specific benchmarks"
+        : "Search/Display CTR: 3.17% | Display CTR: 0.46% | Avg CVR: 3.75% | Avg CPC $2.69"
+
+    const deterministicSummary = `Audited ${campaigns.length} ${platforms.join("/")} campaign${campaigns.length === 1 ? "" : "s"} with ${averages.avgRoas.toFixed(2)}x average ROAS, $${averages.avgCpc.toFixed(2)} CPC, ${averages.avgCtr.toFixed(2)}% CTR, and $${averages.totalSpend.toFixed(2)} spend. Found ${ruleRecommendations.length} rule-backed optimization opportunities from real synced data.`
     let auditData = {
       ...scoreData,
       summary: deterministicSummary,
@@ -131,11 +143,12 @@ export async function POST(req: NextRequest) {
         throw error
       }
       const confidenceThreshold = settings.riskLevel === "CONSERVATIVE" ? 85 : settings.riskLevel === "BALANCED" ? 70 : 0
-      const auditPrompt = `You are an elite Google Ads account auditor with 15 years experience managing $500M+ in ad spend.
+      const auditPrompt = `You are an elite paid-media account auditor.
 
 ACCOUNT SUMMARY:
 Total campaigns: ${campaigns.length}
-Total spend (30 days): $${averages.totalSpend.toFixed(2)}
+Platforms: ${platforms.join(", ")}
+Total spend: $${averages.totalSpend.toFixed(2)}
 Account avg ROAS: ${averages.avgRoas.toFixed(2)}x
 Account avg CPC: $${averages.avgCpc.toFixed(2)}
 Account avg CTR: ${averages.avgCtr.toFixed(2)}%
@@ -144,7 +157,7 @@ Account avg conversion rate: ${averages.avgConversionRate.toFixed(2)}%
 User KPI: ${settings.primaryKpi}, risk level: ${settings.riskLevel}, confidence threshold: ${confidenceThreshold}
 
 INDUSTRY BENCHMARKS:
-Search CTR: 3.17% | Display CTR: 0.46% | Avg CVR: 3.75% | Avg CPC $2.69
+${benchmarkContext}
 
 CAMPAIGN DATA WITH PRE-CALCULATED FLAGS:
 ${JSON.stringify(analyzedCampaigns, null, 2)}

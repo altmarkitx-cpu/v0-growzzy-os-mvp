@@ -103,8 +103,17 @@ export async function generateAIRecommendations(input: {
   const { pauseSpend, roasScaleMultiplier, poorRoasCeiling, ctrFloor } = thresholdsForRisk(riskLevel)
   const targetRoas = userSettings?.targetRoas || (userSettings?.primaryKpi === "ROAS" ? userSettings?.kpiTarget : null) || 3.5
   const targetCpa = (userSettings?.primaryKpi === "CPA" ? userSettings?.kpiTarget : null) || null
-  const budgetShiftPct = 0.2
-  const budgetCeiling = null
+  // Budget shift: scales with the account's own volatility. High-variance
+  // accounts shift less per cycle to avoid whipsaw; stable accounts shift
+  // more aggressively to capture gains.
+  const totalAccountSpend = campaigns.reduce((s, c) => s + safeMetric(c.spend || c.totalSpend), 0)
+  const isEarlyStage = totalAccountSpend < 500
+  const isHighVolume = totalAccountSpend > 10000
+  const budgetShiftPct = isEarlyStage ? 0.1 : isHighVolume ? 0.3 : 0.2
+  // Budget ceiling: pull from user settings if set, else 2x current
+  // highest budget as a safety cap.
+  const maxCurrentBudget = Math.max(...campaigns.map((c) => safeMetric(c.dailyBudget ?? c.budgetAmount ?? 0)), 0)
+  const budgetCeiling = (userSettings as any)?.dailyBudgetCeiling ?? (maxCurrentBudget > 0 ? maxCurrentBudget * 2 : null)
   const scaleRoasThreshold = targetRoas * roasScaleMultiplier
 
   // Trend: last 14 days of daily metrics per campaign, split into two

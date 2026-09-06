@@ -11,13 +11,14 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 const PERIOD_OPTIONS = ["Last 7 days", "Last 30 days", "Last 90 days", "All time"]
-const CHART_TABS = ["Daily", "Weekly", "Monthly"]
+const CHART_TABS = ["Daily", "Cumulative"]
 
 type Kpi = { current: number; previous: number; changePercent: number }
 type StatsResponse = {
   hasAnyConnectedAccount: boolean
   hasCampaignData: boolean
   totals: { spend: number; conversions: number; avgRoas: number; clicks: number }
+  previousTotals?: { spend: number; conversions: number; avgRoas: number }
   kpis: { spend: Kpi; conversions: Kpi; roas: Kpi }
   topCampaigns: Array<{
     id: string
@@ -82,14 +83,15 @@ export default function DashboardPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/dashboard/stats", { cache: "no-store" })
+      const days = period === "Last 7 days" ? 7 : period === "Last 90 days" ? 90 : period === "All time" ? 365 : 30
+      const res = await fetch(`/api/dashboard/stats?days=${days}`, { cache: "no-store" })
       if (res.ok) setData(await res.json())
     } catch {
       /* keep last data; empty states cover the rest */
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [period])
 
   useEffect(() => {
     load()
@@ -101,16 +103,25 @@ export default function DashboardPage() {
   const spendKpi = data?.kpis?.spend
   const convKpi = data?.kpis?.conversions
   const roasKpi = data?.kpis?.roas
+  const prev = data?.previousTotals
   const costPerResult =
     data && data.totals.conversions > 0 ? data.totals.spend / data.totals.conversions : null
 
   const chartData =
     data?.spendByDay?.length
-      ? data.spendByDay.map((d) => ({
-          month: new Date(d.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-          spend: Number(d.spend || 0),
-          conversions: Number(d.conversions || 0),
-        }))
+      ? data.spendByDay.map((d, i, arr) => {
+          const cumulative = chartTab === "Cumulative"
+            ? arr.slice(0, i + 1).reduce((sum, day) => sum + Number(day.spend || 0), 0)
+            : Number(d.spend || 0)
+          const cumulativeConv = chartTab === "Cumulative"
+            ? arr.slice(0, i + 1).reduce((sum, day) => sum + Number(day.conversions || 0), 0)
+            : Number(d.conversions || 0)
+          return {
+            month: new Date(d.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+            spend: Number(cumulative.toFixed(2)),
+            conversions: Number(cumulativeConv.toFixed(2)),
+          }
+        })
       : []
 
   const trend = (k?: Kpi) =>
@@ -168,13 +179,13 @@ export default function DashboardPage() {
           <KpiCard
             label="Total Spend"
             value={spendKpi ? money(spendKpi.current) : "$0"}
-            caption={hasData ? period : "No campaigns live yet"}
+            caption={prev ? `was ${money(prev.spend)} prev ${period.toLowerCase()}` : hasData ? period : "No campaigns live yet"}
             trend={trend(spendKpi)}
           />
           <KpiCard
             label="Conversions"
             value={convKpi ? String(Math.round(convKpi.current)) : "0"}
-            caption={hasData ? period : "No data yet"}
+            caption={prev ? `was ${Math.round(prev.conversions)} prev ${period.toLowerCase()}` : hasData ? period : "No data yet"}
             trend={trend(convKpi)}
           />
           <KpiCard
@@ -185,7 +196,7 @@ export default function DashboardPage() {
           <KpiCard
             label="ROAS"
             value={roasKpi && roasKpi.current > 0 ? roasKpi.current.toFixed(2) + "x" : "—"}
-            caption={hasData ? period : "No data yet"}
+            caption={prev ? `was ${prev.avgRoas.toFixed(2)}x prev ${period.toLowerCase()}` : hasData ? period : "No data yet"}
             trend={trend(roasKpi)}
           />
         </div>
@@ -307,7 +318,7 @@ export default function DashboardPage() {
               </div>
               <p className="text-[12.5px] font-semibold text-[#374151]">No recommendations yet</p>
               <p className="text-[11px] text-[#9CA3AF] mt-1">
-                {connected ? "Growzzy will flag issues once campaigns have data." : "Connect your ad account to get AI-powered suggestions."}
+                {connected ? "Issues will be flagged once campaigns have data." : "Connect your ad account to get AI-powered suggestions."}
               </p>
             </div>
           </div>

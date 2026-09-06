@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth"
 import { prisma, logSchemaHealthOnce } from "@/lib/prisma"
 import { resolveUserId } from "@/lib/resolve-user"
 import { sendEmail } from "@/lib/email"
+
+const PRODUCT_NAME = process.env.PRODUCT_NAME || "Growzzy OS"
 import { scoreLeadFit } from "@/lib/marketing-logic"
 import { getRequestWorkspaceId } from "@/lib/workspace"
 import { getActiveAdAccountScope } from "@/lib/account-scope"
@@ -174,9 +176,9 @@ export async function POST(req: NextRequest) {
     if (lead.email) {
       await sendEmail({
         to: lead.email,
-        subject: "Welcome from GrowzzyOS",
-        html: `<div style="font-family:Arial,sans-serif;"><h2>Hi ${lead.name},</h2><p>Thanks for connecting with GrowzzyOS. Our team will contact you shortly.</p></div>`,
-        text: `Hi ${lead.name}, Thanks for connecting with GrowzzyOS.`,
+        subject: `Welcome from ${PRODUCT_NAME}`,
+        html: `<div style="font-family:Arial,sans-serif;"><h2>Hi ${lead.name},</h2><p>Thanks for connecting with ${PRODUCT_NAME}. Our team will contact you shortly.</p></div>`,
+        text: `Hi ${lead.name}, Thanks for connecting with ${PRODUCT_NAME}.`,
       }).catch(() => undefined)
     }
 

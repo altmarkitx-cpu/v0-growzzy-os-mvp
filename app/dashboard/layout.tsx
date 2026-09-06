@@ -4,7 +4,7 @@ import { AdsAccountGate } from "@/components/AdsAccountGate"
 import { OnboardingGate } from "@/components/onboarding-gate"
 
 export const metadata = {
-  title: "Dashboard | Growzzy OS",
+  title: `Dashboard | ${process.env.NEXT_PUBLIC_PRODUCT_NAME || "Growzzy OS"}`,
 }
 
 export default function DashboardRootLayout({

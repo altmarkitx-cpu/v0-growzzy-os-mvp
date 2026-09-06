@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+const PRODUCT_NAME = process.env.NEXT_PUBLIC_PRODUCT_NAME || 'Growzzy OS'
+
 type Section = 'goal' | 'creative' | 'audience' | 'placements' | 'destination' | 'budget' | 'policy'
 
 const SECTIONS: { id: Section; label: string; desc: string }[] = [
@@ -62,21 +64,14 @@ interface CampaignData {
   platform?: 'GOOGLE' | 'META'
 }
 
-function emptyAdGroup(name = 'Core Performance Ad Group'): AdGroupEdit {
+function emptyAdGroup(): AdGroupEdit {
   return {
-    name,
-    theme: 'Core Keywords',
-    keywords: [
-      { keyword: 'b2b lead generation ai', type: 'phrase' },
-      { keyword: 'ai automation software', type: 'phrase' },
-      { keyword: 'agency growth platform', type: 'exact' },
-    ],
-    negativeKeywords: ['free', 'jobs', 'diy'],
-    headlines: ['Boost Lead Generation with AI', 'Scalable AI Automation', 'Transform Your Business Growth'],
-    descriptions: [
-      'Generate qualified B2B leads using cutting-edge AI automation. Book a demo today.',
-      'Designed for growth teams looking to scale operations and optimize marketing ROI.',
-    ],
+    name: '',
+    theme: '',
+    keywords: [],
+    negativeKeywords: [],
+    headlines: [],
+    descriptions: [],
   }
 }
 
@@ -104,17 +99,17 @@ export default function CampaignBuilderPage() {
   const [activePreviewTab, setActivePreviewTab] = useState<'google' | 'meta'>('google')
 
   const [data, setData] = useState<CampaignData>({
-    campaignName: 'B2B AI Automation Campaign',
-    prompt: 'Create a performance ad campaign to generate qualified leads for our AI automation agency.',
-    detectedChips: ['B2B', 'Automation', 'Leads'],
-    goal: 'Lead Generation',
-    platform: 'META',
+    campaignName: '',
+    prompt: '',
+    detectedChips: [],
+    goal: '',
+    platform: 'GOOGLE',
     adGroups: [emptyAdGroup()],
-    dailyBudget: 50,
+    dailyBudget: undefined,
     currency: 'USD',
     duration: 30,
-    locations: ['United States'],
-    finalUrl: 'https://markitx.com/lead-gen',
+    locations: [],
+    finalUrl: '',
     languages: ['English'],
     biddingStrategy: 'MAXIMIZE_CONVERSIONS',
   })
@@ -129,9 +124,7 @@ export default function CampaignBuilderPage() {
 
   // Creative Studio state inside Builder
   const [creativeMode, setCreativeMode] = useState<'image' | 'video' | 'upload'>('image')
-  const [promptText, setPromptText] = useState(
-    'Professional modern B2B SaaS dashboard visual showing AI lead generation analytics, dark mode interface with clean neon blue accents'
-  )
+  const [promptText, setPromptText] = useState('')
   const [aiModel, setAiModel] = useState('DALL-E 3 (OpenAI)')
   const [creativeAspect, setCreativeAspect] = useState('1:1')
   const [creativeGenerating, setCreativeGenerating] = useState(false)
@@ -145,8 +138,8 @@ export default function CampaignBuilderPage() {
   const activeGroup = data.adGroups[activeGroupIdx] || data.adGroups[0] || emptyAdGroup()
   const headlinesList = activeGroup.headlines.filter((h) => h.trim())
   const descriptionsList = activeGroup.descriptions.filter((d) => d.trim())
-  const previewHeadline = headlinesList[0] || data.campaignName || 'Boost Lead Generation with AI'
-  const previewDescription = descriptionsList[0] || data.prompt || 'Transform your marketing results with intelligent AI campaigns.'
+  const previewHeadline = headlinesList[0] || data.campaignName || ''
+  const previewDescription = descriptionsList[0] || data.prompt || ''
 
   useEffect(() => {
     if (!planIdFromQuery) return
@@ -163,7 +156,7 @@ export default function CampaignBuilderPage() {
           const userPrompt = b.enhancedText || b.prompt || ''
 
           setData({
-            campaignName: json.data.name || b.productOrOffer || 'B2B Lead Generation',
+            campaignName: json.data.name || b.productOrOffer || '',
             prompt: userPrompt,
             detectedChips: b.chips || [],
             goal: b.goal || 'Lead Generation',
@@ -173,23 +166,25 @@ export default function CampaignBuilderPage() {
               theme: g.theme || '',
               keywords: (g.keywords || []).map((k: any) => (typeof k === 'string' ? { keyword: k, type: 'phrase' } : k)),
               negativeKeywords: g.negativeKeywords || [],
-              headlines: g.headlines && g.headlines.length > 0 ? g.headlines : ['Boost Lead Generation with AI', 'Scalable AI Automation', 'Transform Your Agency Growth'],
-              descriptions: g.descriptions && g.descriptions.length > 0 ? g.descriptions : ['Generate qualified B2B leads using cutting-edge AI automation. Book a demo today.', 'Designed for agencies looking to scale operations.'],
+              headlines: g.headlines || [],
+              descriptions: g.descriptions || [],
             })),
-            dailyBudget: planData.dailyBudget || 50,
+            dailyBudget: planData.dailyBudget ?? undefined,
             currency: planData.currency || 'USD',
             duration: planData.duration || 30,
-            locations: planData.locations || [b.geography || 'United States'],
-            finalUrl: planData.finalUrl || 'https://markitx.com',
+            locations: planData.locations || [],
+            finalUrl: planData.finalUrl || '',
             languages: planData.languages || ['English'],
             biddingStrategy: planData.biddingStrategy || 'MAXIMIZE_CONVERSIONS',
             targetCpa: planData.targetCpa || null,
           })
 
-          const persona = b.targetCustomer || 'target prospects'
-          const offer = json.data.name || b.productOrOffer || 'B2B AI Software'
-          const dynamicVisualPrompt = planData.imagePrompt || 
-            `High-converting visual ad for ${offer} targeting ${persona}. ${userPrompt.slice(0, 100)}. Modern high-contrast dark mode dashboard UI with glowing neon blue analytics, 3D metric charts, clean studio lighting, 4k digital advertising photography`
+          const persona = b.targetCustomer || ''
+          const offer = json.data.name || b.productOrOffer || ''
+          const dynamicVisualPrompt = planData.imagePrompt ||
+            (offer && persona
+              ? `High-converting visual ad for ${offer} targeting ${persona}. ${userPrompt.slice(0, 100)}. Modern high-contrast dark mode dashboard UI with glowing neon blue analytics, 3D metric charts, clean studio lighting, 4k digital advertising photography`
+              : planData.imagePrompt || '')
 
           setPromptText(dynamicVisualPrompt)
           setPlanId(planIdFromQuery)
@@ -226,10 +221,10 @@ export default function CampaignBuilderPage() {
       if (json?.imageUrls?.[0]) {
         setGeneratedImageUrl(json.imageUrls[0])
       } else {
-        setGeneratedImageUrl('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80')
+        setGeneratedImageUrl('')
       }
     } catch {
-      setGeneratedImageUrl('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80')
+      setGeneratedImageUrl('')
     } finally {
       setCreativeGenerating(false)
     }
@@ -276,7 +271,7 @@ export default function CampaignBuilderPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: data.campaignName || 'B2B AI Automation Campaign',
+          name: data.campaignName || 'Untitled Campaign',
           platform: 'GOOGLE',
           type: 'DISPLAY',
           objective: data.goal || 'LEADS',
@@ -322,7 +317,7 @@ export default function CampaignBuilderPage() {
       } else {
         const errorMsg = typeof publishJson?.error === 'object' ? publishJson?.error?.message : (publishJson?.error || publishJson?.message || 'Google Ads account is not connected yet.')
         alert(`Notice: ${errorMsg}\n\nTo push live to Google Ads, connect your account under Settings -> Integrations. Your campaign has been saved to your dashboard as a draft!`)
-        setLaunched({ isLive: false, externalCampaignId: campaignId, message: '📝 Campaign saved as a draft in Growzzy OS.' })
+        setLaunched({ isLive: false, externalCampaignId: campaignId, message: `📝 Campaign saved as a draft in ${PRODUCT_NAME}.` })
       }
     } catch (err: any) {
       alert(`Notice: ${err?.message || 'Campaign saved as draft.'}\n\nConnect your Google Ads account under Settings -> Integrations to launch live.`)
@@ -335,7 +330,7 @@ export default function CampaignBuilderPage() {
   return (
     <Shell>
       <div className="flex h-[calc(100vh-56px)] bg-[#F6F7F9] overflow-hidden">
-        {/* Left Navigation Panel — Growzzy OS CAMPAIGN FLOW */}
+        {/* Left Navigation Panel — CAMPAIGN FLOW */}
         <div className="w-[250px] bg-white border-r border-[#E5E7EB] p-5 hidden lg:flex flex-col overflow-y-auto">
           <h3 className="text-[11px] font-bold text-[#6B7280] tracking-wider uppercase mb-1">CAMPAIGN FLOW</h3>
           <p className="text-[11.5px] text-[#9CA3AF] mb-5 leading-tight">Complete all steps before publish</p>
@@ -452,7 +447,7 @@ export default function CampaignBuilderPage() {
                   <div>
                     <label className="block text-[12px] font-semibold text-[#374151] mb-1.5">AI Campaign Brief</label>
                     <p className="text-[12px] text-[#4B5563] p-3 bg-[#F0F2F5] rounded-[10px] leading-relaxed">
-                      {data.prompt || 'Targeting B2B prospects for lead generation with visual display creative'}
+                      {data.prompt || 'No campaign brief yet — fill in the fields above or generate one with the AI Campaign Planner.'}
                     </p>
                   </div>
                 </div>
@@ -531,7 +526,7 @@ export default function CampaignBuilderPage() {
                     </div>
 
                     <p className="text-[11.5px] text-[#6B7280]">
-                      Growzzy AI analyzed your prompt, Brand Memory & direct-response marketing rules to synthesize this high-converting image prompt:
+                      AI analyzed your prompt, Brand Memory & direct-response marketing rules to synthesize this high-converting image prompt:
                     </p>
 
                     <textarea
@@ -862,11 +857,11 @@ export default function CampaignBuilderPage() {
                   </div>
                   <div>
                     <h3 className="text-[14px] font-bold text-[#111827]">Budget & Bidding</h3>
-                    <p className="text-[11.5px] text-[#9CA3AF]">${data.dailyBudget || 50}/day ({data.duration || 30} days)</p>
+                    <p className="text-[11.5px] text-[#9CA3AF]">${data.dailyBudget ?? '—'}/day ({data.duration || 30} days)</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-[12.5px] font-semibold text-[#1F57F5]">
-                  <span>${data.dailyBudget}/day</span>
+                  <span>${data.dailyBudget != null ? data.dailyBudget : '—'}/day</span>
                   <Pencil size={13} />
                 </div>
               </button>
@@ -892,8 +887,8 @@ export default function CampaignBuilderPage() {
                       <input
                         type="number"
                         min="1"
-                        value={data.dailyBudget || 50}
-                        onChange={(e) => setData({ ...data, dailyBudget: parseFloat(e.target.value) || 0 })}
+                        value={data.dailyBudget != null ? data.dailyBudget : ''}
+                        onChange={(e) => setData({ ...data, dailyBudget: e.target.value ? parseFloat(e.target.value) : undefined })}
                         className="w-full h-10 px-3 bg-white border border-[#D1D5DB] rounded-[10px] text-[13px] text-[#111827] outline-none focus:border-[#1F57F5]"
                       />
                     </div>
@@ -910,7 +905,7 @@ export default function CampaignBuilderPage() {
                   </div>
 
                   <div className="p-3.5 bg-[#EAF0FE] border border-[#C7D9FD] rounded-[10px] text-[12.5px] text-[#1F57F5] font-semibold">
-                    Estimated total campaign budget: USD ${((data.dailyBudget || 50) * (data.duration || 30)).toLocaleString()} ({data.duration || 30} days)
+                    Estimated total campaign budget: USD ${data.dailyBudget != null && data.duration != null ? (data.dailyBudget * data.duration).toLocaleString() : '—'} ({data.duration || 30} days)
                   </div>
                 </div>
               )}

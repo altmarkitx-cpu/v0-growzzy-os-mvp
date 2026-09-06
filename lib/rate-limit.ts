@@ -11,7 +11,10 @@ export type RateLimitOptions = {
   strict?: boolean
 }
 
-export const RATE_LIMIT_POLICIES = {
+// Base policies — same for everyone, but each policy now supports a
+// tier multiplier applied at lookup time. Pro users get 3x, agency users
+// get 10x, free users stay at 1x.
+const BASE_POLICIES = {
   aiUtility: { burst: [20, 60_000], day: 100, month: 1_000 },
   chatMessage: { burst: [15, 60_000], day: 80, month: 800 },
   campaignPlan: { burst: [5, 60_000], day: 20, month: 200 },
@@ -21,6 +24,30 @@ export const RATE_LIMIT_POLICIES = {
   campaignLaunch: { burst: [2, 60_000], day: 5, month: 50 },
   optimizationMutation: { burst: [10, 60_000], day: 50, month: 500 },
 } as const
+
+// Tier multipliers — free users get 1x, pro 3x, agency 10x.
+const TIER_MULTIPLIERS = {
+  free: { burst: 1, day: 1, month: 1 },
+  pro: { burst: 2, day: 3, month: 3 },
+  agency: { burst: 5, day: 10, month: 10 },
+} as const
+
+export function getPolicyForUser(
+  policyName: keyof typeof BASE_POLICIES,
+  tier: keyof typeof TIER_MULTIPLIERS = "free",
+) {
+  const base = BASE_POLICIES[policyName]
+  const mult = TIER_MULTIPLIERS[tier]
+  return {
+    burst: [Math.ceil(base.burst[0] * mult.burst), base.burst[1]] as [number, number],
+    day: Math.ceil(base.day * mult.day),
+    month: Math.ceil(base.month * mult.month),
+  }
+}
+
+// Backward-compatible export: default to free tier. Routes that know the
+// user's tier call getPolicyForUser directly.
+export const RATE_LIMIT_POLICIES = BASE_POLICIES
 
 export type RateLimitPolicy = keyof typeof RATE_LIMIT_POLICIES
 

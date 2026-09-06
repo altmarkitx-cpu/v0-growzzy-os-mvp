@@ -144,8 +144,47 @@ export async function POST(request: Request) {
 
     const workspace = await prisma.workspace.findUnique({
       where: { id: workspaceId },
-      select: { name: true, industry: true, toneOfVoice: true, productDescription: true },
+      select: { name: true, industry: true, toneOfVoice: true, productDescription: true, websiteUrl: true },
     })
+
+    // Fetch top-performing angles from existing generated creatives for this ad account
+    const existingCreatives = adAccountId
+      ? await prisma.generatedCreative.findMany({
+          where: { workspaceId, adAccountId },
+          orderBy: [{ score: "desc" }, { createdAt: "desc" }],
+          take: 5,
+          select: { score: true, variations: true },
+        })
+      : []
+
+    // Fetch campaign performance metrics if a campaign is selected
+    const campaignMetrics = campaign?.id
+      ? await prisma.campaignMetricDaily.findMany({
+          where: { campaignId: campaign.id },
+          orderBy: { metricDate: "desc" },
+          take: 14,
+          select: { ctr: true, roas: true, spend: true, conversions: true },
+        }).then((rows) => {
+          const spend = rows.reduce((s, r) => s + Number(r.spend || 0), 0)
+          const conversions = rows.reduce((s, r) => s + Number(r.conversions || 0), 0)
+          const avgCtr = rows.length ? rows.reduce((s, r) => s + Number(r.ctr || 0), 0) / rows.length : 0
+          const avgRoas = rows.length ? rows.reduce((s, r) => s + Number(r.roas || 0), 0) / rows.length : 0
+          return { spend, conversions, avgCtr, avgRoas, hasData: rows.length > 0 }
+        }).catch(() => null)
+      : null
+
+    const existingAngleSummary = existingCreatives.length
+      ? `Existing top creative angles: ${existingCreatives.map((c) => {
+          const cVars = Array.isArray(c.variations) ? c.variations : []
+          const top = cVars[0] as any
+          return top?.angle || top?.headline?.slice(0, 40) || "unknown"
+        }).join("; ")}.`
+      : ""
+
+    const campaignContext = campaignMetrics?.hasData
+      ? `Campaign performance context: ${campaign?.name} has ${campaignMetrics.conversions.toFixed(0)} conversions, ${campaignMetrics.avgCtr.toFixed(2)}% avg CTR, ${campaignMetrics.avgRoas.toFixed(2)}x avg ROAS over the last 14 days.`
+      : ""
+
     const businessName = input.businessName || workspace?.name || "Our Business"
     const productDescription = input.productDescription || workspace?.productDescription || "Not provided"
     const brandTone = input.brandTone || input.tone || workspace?.toneOfVoice || "Professional"
@@ -166,7 +205,10 @@ Product/Offer: ${productDescription}
 Value prop: ${input.valueProp || productDescription}
 Pain point: ${input.painPoint || "Not provided"}
 CTA: ${input.cta || "Shop Now"}
-Audience: ${input.targetPersona || input.targetAudience || "Target customers"}${businessContext}`
+Audience: ${input.targetPersona || input.targetAudience || "Target customers"}
+${campaignContext}
+${existingAngleSummary}
+${businessContext}`
 
       try {
         const completion = await openai.chat.completions.create({

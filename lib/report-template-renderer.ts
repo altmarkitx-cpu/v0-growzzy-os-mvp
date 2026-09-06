@@ -21,6 +21,7 @@ type ReportBuildInput = {
   workspaceId?: string | null
   adAccountId?: string | null
   dateRange?: ReportDateRange
+  userTargetRoas?: number | null
 }
 
 type TemplateDefinition = {
@@ -276,11 +277,34 @@ async function generateNarrative(data: Record<string, unknown>, type: ReportType
   }
 }
 
+// Returns the target ROAS based on explicit user setting or risk-level default
+function resolveTargetRoas(userTargetRoas: number | null | undefined, riskLevel: string | null | undefined): number {
+  if (userTargetRoas != null && userTargetRoas > 0) return userTargetRoas
+  // Risk-level defaults: AGGRESSIVE targets 6x, BALANCED targets 4x, CONSERVATIVE targets 2x
+  if (riskLevel === "AGGRESSIVE") return 6
+  if (riskLevel === "CONSERVATIVE") return 2
+  return 4 // BALANCED default
+}
+
 export async function buildReportData(input: ReportBuildInput) {
   const now = new Date()
   const start = input.dateRange?.start ? new Date(input.dateRange.start) : new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000)
   const end = input.dateRange?.end ? new Date(input.dateRange.end) : now
   const reportId = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`
+
+  // Fetch user settings to get adaptive target ROAS and risk level
+  let userTargetRoas = input.userTargetRoas ?? null
+  let riskLevel: string | null = null
+  try {
+    const settings = await prisma.userSettings.findUnique({ where: { userId: input.userId } })
+    if (settings) {
+      riskLevel = settings.riskLevel
+      if (userTargetRoas == null && settings.targetRoas != null) userTargetRoas = settings.targetRoas
+    }
+  } catch { /* userSettings may not exist yet */ }
+
+  const targetRoas = resolveTargetRoas(userTargetRoas, riskLevel)
+  const maxRoas = targetRoas * 2
 
   const connectedIntegrations = await prisma.integration.findMany({
     where: {
@@ -494,21 +518,35 @@ export async function buildReportData(input: ReportBuildInput) {
     efficiencyDelta: "N/A",
     cpmDelta: "N/A",
     conversionDelta: "N/A",
-    benchmarkCtr: "3.17%",
-    benchmarkCpc: "$2.69",
-    benchmarkCpm: "$9.80",
-    benchmarkConversionRate: "3.75%",
-    adRelevanceScore: campaigns.length ? "8.0" : "N/A",
-    landingPageScore: campaigns.length ? "7.5" : "N/A",
-    expectedCtrScore: campaigns.length ? "8.2" : "N/A",
-    overallQualityScore: campaigns.length ? "7.9" : "N/A",
-    adRelevancePct: campaigns.length ? 80 : 0,
-    landingPagePct: campaigns.length ? 75 : 0,
-    expectedCtrPct: campaigns.length ? 82 : 0,
-    overallQualityPct: campaigns.length ? 79 : 0,
-    targetRoas: "4.00x",
-    targetGap: formatRoas(Math.abs(blendedRoas - 4)),
-    maxRoas: "8.00x",
+    benchmarkCtr: connectedPlatforms.includes("META") && connectedPlatforms.includes("GOOGLE")
+      ? "2.50%"
+      : connectedPlatforms.includes("META")
+        ? "0.90%"
+        : "3.17%",
+    benchmarkCpc: connectedPlatforms.includes("META") && connectedPlatforms.includes("GOOGLE")
+      ? "$1.80"
+      : connectedPlatforms.includes("META")
+        ? "$0.90"
+        : "$2.69",
+    benchmarkCpm: connectedPlatforms.includes("META") && connectedPlatforms.includes("GOOGLE")
+      ? "$6.50"
+      : connectedPlatforms.includes("META")
+        ? "$3.20"
+        : "$9.80",
+    benchmarkConversionRate: connectedPlatforms.includes("META")
+      ? "2.50%"
+      : "3.75%",
+    adRelevanceScore: campaigns.length ? "N/A" : "N/A",
+    landingPageScore: campaigns.length ? "N/A" : "N/A",
+    expectedCtrScore: campaigns.length ? "N/A" : "N/A",
+    overallQualityScore: campaigns.length ? "N/A" : "N/A",
+    adRelevancePct: campaigns.length ? 0 : 0,
+    landingPagePct: campaigns.length ? 0 : 0,
+    expectedCtrPct: campaigns.length ? 0 : 0,
+    overallQualityPct: campaigns.length ? 0 : 0,
+    targetRoas: `${targetRoas.toFixed(2)}x`,
+    targetGap: formatRoas(Math.abs(blendedRoas - targetRoas)),
+    maxRoas: `${maxRoas.toFixed(2)}x`,
     targetLinePct: 50,
     bestChannelName: byPlatform.sort((a, b) => Number.parseFloat(b.roas) - Number.parseFloat(a.roas))[0]?.platform || "No channel",
     bestChannelRoas: byPlatform.sort((a, b) => Number.parseFloat(b.roas) - Number.parseFloat(a.roas))[0]?.roas || "0.00x",

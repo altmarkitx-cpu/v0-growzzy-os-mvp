@@ -8,6 +8,8 @@ import { AlertTriangle, Check, Trash2, ChevronDown, Settings, Plug, Bell, Shield
 import { cn } from "@/lib/utils"
 import { CURATED_AVATARS } from "@/lib/profile-avatars"
 
+const PRODUCT_NAME = process.env.NEXT_PUBLIC_PRODUCT_NAME || "Growzzy OS"
+
 type Tab = "profile" | "general" | "integrations" | "notifications" | "danger"
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
@@ -31,7 +33,7 @@ function ProfileTab() {
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => {
         setImage(json?.user?.image || "")
-        setName(json?.user?.name || json?.user?.email || "Growzzy user")
+        setName(json?.user?.name || json?.user?.email || "User")
       })
       .finally(() => setLoading(false))
   }, [])
@@ -68,11 +70,11 @@ function ProfileTab() {
     }
   }
 
-  if (loading) return <SectionCard title="Profile picture" description="Choose how you appear in Growzzy."><div className="flex justify-center py-10 text-[#9CA3AF]"><Loader2 className="animate-spin" size={20} /></div></SectionCard>
+  if (loading) return <SectionCard title="Profile picture" description={`Choose how you appear in ${PRODUCT_NAME}.`}><div className="flex justify-center py-10 text-[#9CA3AF]"><Loader2 className="animate-spin" size={20} /></div></SectionCard>
 
   return (
     <>
-    <SectionCard title="Profile picture" description="Upload your own photo or choose a Growzzy avatar.">
+    <SectionCard title="Profile picture" description={`Upload your own photo or choose an avatar.`}>
       <div className="flex items-center gap-4 mb-5">
         <div className="w-16 h-16 overflow-hidden rounded-full bg-[#EAF0FE] flex items-center justify-center text-[#1F57F5] text-lg font-bold ring-2 ring-white shadow-[0_1px_4px_rgba(0,0,0,0.14)]">
           {image ? <img src={image} alt={`${name} profile`} className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
@@ -103,7 +105,7 @@ function ProfileTab() {
     <SectionCard title="Account session" description="Manage your current signed-in session.">
       <div className="flex items-center justify-between py-2">
         <div>
-          <p className="text-[13.5px] font-semibold text-[#111827]">Sign out of Growzzy</p>
+          <p className="text-[13.5px] font-semibold text-[#111827]">Sign out</p>
           <p className="text-[12px] text-[#6B7280] mt-0.5">End your active session on this device.</p>
         </div>
         <button
@@ -563,13 +565,13 @@ function NotificationsTab() {
   }
 
   if (loading) {
-    return <SectionCard title="In-app notifications" description="Choose what appears in your Growzzy notification feed.">
+    return <SectionCard title="In-app notifications" description={`Choose what appears in your notification feed.`}>
       <div className="flex items-center justify-center py-10 text-[#9CA3AF]"><Loader2 className="animate-spin" size={20} /></div>
     </SectionCard>
   }
 
   return (
-    <SectionCard title="In-app notifications" description="Choose what appears in your Growzzy notification feed.">
+    <SectionCard title="In-app notifications" description={`Choose what appears in your notification feed.`}>
       <div>
         <SkuToggle label="Weekly performance digest" description="Show a summary of spend, results, and AI actions every Monday" checked={prefs.weeklyDigest} onChange={(v) => update({ weeklyDigest: v })} />
         <SkuToggle label="Optimization alerts" description="Notify when AI flags something that needs your attention" checked={prefs.optimizationAlerts} onChange={(v) => update({ optimizationAlerts: v })} />
@@ -699,10 +701,10 @@ export default function SettingsPage() {
   }
 
   const TAB_DESCRIPTIONS: Record<Tab, string> = {
-    profile:       "Choose how your account appears across Growzzy.",
+    profile:       "Choose how your account appears.",
     general:       "Configure your workspace identity and AI context.",
     integrations:  "Connect your ad platforms to start running campaigns.",
-    notifications: "Control which emails Growzzy sends you.",
+    notifications: "Control which emails you receive.",
     danger:        "Irreversible actions — proceed with caution.",
   }
 

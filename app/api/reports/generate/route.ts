@@ -11,9 +11,13 @@ async function getUser(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return null
   const userId = await resolveUserId(session.user.id)
+  const workspaceId = await getRequestWorkspaceId(userId, req)
+  const workspace = workspaceId
+    ? await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } }).catch(() => null)
+    : null
   return {
     id: userId,
-    accountName: session.user.name || session.user.email || "Growzzy Account",
+    accountName: session.user.name || workspace?.name || session.user.email || "My Account",
   }
 }
 

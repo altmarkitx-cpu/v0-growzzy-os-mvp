@@ -561,15 +561,11 @@ export function CampaignCard({
 
   const artifactData: ArtifactData = {
     title: campaign.name,
-    brandName: campaign.name.split("—")[0]?.trim() || "MARKITX",
+    brandName: campaign.name.split("—")[0]?.trim() || "",
     platform: campaign.platform,
     headlines: Array.isArray(campaign.headlines) && campaign.headlines.length > 0
       ? campaign.headlines.map((h: string | { text: string }) => typeof h === "string" ? h : h?.text ?? "")
-      : [
-          "Your AI stack has a performance leak.",
-          "Most AI builds fail ops. Audit yours.",
-          "Free AI audit for engineering leaders",
-        ],
+      : [],
     primaryText: campaign.primaryText,
     cta: campaign.cta,
     targeting: campaign.targeting,

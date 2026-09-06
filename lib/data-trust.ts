@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client"
 const UNVERIFIED_EXTERNAL_PREFIXES = ["local-", "google-seed-", "mock-", "mock_", "demo-", "demo_"]
 
 const DEMO_CAMPAIGN_NAMES = [
-  "Growzzy Marketing",
+  "Marketing",
   "Summer Sale 2025",
   "Brand Awareness Campaign",
   "Retargeting Campaign",

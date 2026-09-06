@@ -19,7 +19,7 @@ function NewCampaignContent() {
 export default function NewCampaignPage() {
   return (
     <Shell>
-      <Suspense fallback={<div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">Loading Growzzy Agent...</div>}>
+      <Suspense fallback={<div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">Loading campaign builder...</div>}>
         <NewCampaignContent />
       </Suspense>
     </Shell>

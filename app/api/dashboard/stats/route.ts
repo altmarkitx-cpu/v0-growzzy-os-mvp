@@ -169,12 +169,15 @@ export async function GET(request: NextRequest) {
       take: 500,
     })
 
+    const requestedDays = Number(request.nextUrl.searchParams.get("days") || 30)
+    const periodDays = [7, 30, 90, 365].includes(requestedDays) ? requestedDays : 30
+
     const current = aggregateCampaigns(campaigns)
     const metricWindowEnd = new Date()
     const metricWindowStart = new Date(metricWindowEnd)
-    metricWindowStart.setDate(metricWindowStart.getDate() - 30)
+    metricWindowStart.setDate(metricWindowStart.getDate() - periodDays)
     const previousWindowStart = new Date(metricWindowStart)
-    previousWindowStart.setDate(previousWindowStart.getDate() - 30)
+    previousWindowStart.setDate(previousWindowStart.getDate() - periodDays)
 
     const previousMetricsWithAccountFilter =
       connectedPlatforms.length > 0 && selectedAdAccountIds.length > 0
@@ -368,6 +371,13 @@ export async function GET(request: NextRequest) {
       avgCtr: Number(current.avgCtr.toFixed(2)),
       avgCpc: Number(current.avgCpc.toFixed(2)),
     }
+    const previousTotals = {
+      spend: Number(previous.totalSpend.toFixed(2)),
+      impressions: previous.totalImpressions,
+      clicks: previous.totalClicks,
+      conversions: Number(previous.totalConversions.toFixed(2)),
+      avgRoas: Number(previous.avgRoas.toFixed(2)),
+    }
     const isStale = lastSyncedAt ? Date.now() - new Date(lastSyncedAt).getTime() > 24 * 60 * 60 * 1000 : false
 
     return NextResponse.json(
@@ -378,6 +388,7 @@ export async function GET(request: NextRequest) {
         hasAnyConnectedAccount: accountConnectedIntegrations.length > 0,
         connectedAccountPlatforms: [...new Set(accountConnectedIntegrations.map((integration) => integration.platform as PlatformKey))],
         totals,
+        previousTotals,
         byPlatform,
         hasCampaignData: campaigns.length > 0,
         totalSpend: totals.spend,

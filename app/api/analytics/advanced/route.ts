@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { resolveUserId } from "@/lib/resolve-user"
 import { prisma } from "@/lib/prisma"
-import { detectAlerts, type MetricPoint } from "@/lib/alert-rules"
+import { detectAdaptiveAlerts, deriveAlertConfig } from "@/lib/adaptive-alerts"
 import { getRequestWorkspaceId } from "@/lib/workspace"
 import { verifiedMetricCampaignWhere } from "@/lib/data-trust"
 import { log } from "@/lib/logger"
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     })
 
     const byDate = new Map<string, { timestamp: string; spend: number; impressions: number; clicks: number; conversions: number; revenue: number }>()
-    const metricPoints: MetricPoint[] = metrics.map((metric) => ({
+    const metricPoints = metrics.map((metric) => ({
       timestamp: metric.metricDate.toISOString(),
       platform: metric.campaign.platform as AnalyticsPlatform,
       reach: 0,
@@ -109,14 +109,52 @@ export async function GET(request: NextRequest) {
       botScore: null,
     }))
 
+    // Derive adaptive alert config from 30-day spend and computed baseline
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    const baselineMetrics = await prisma.campaignMetricDaily.findMany({
+      where: {
+        metricDate: { gte: thirtyDaysAgo },
+        campaign: {
+          ...verifiedMetricCampaignWhere({ userId, workspaceId }),
+          platform: { in: activePlatforms },
+          adAccountId: { in: selectedAccountIds },
+        },
+      },
+      select: { spend: true, ctr: true },
+    })
+    const spendVals = baselineMetrics.map((m) => Number(m.spend || 0))
+    const ctrVals = baselineMetrics.map((m) => Number(m.ctr || 0))
+    const avgDailySpend = spendVals.length ? spendVals.reduce((a, b) => a + b, 0) / spendVals.length : 0
+    const avgDailyCtr = ctrVals.length ? ctrVals.reduce((a, b) => a + b, 0) / ctrVals.length : 0
+    const stdDevSpend = spendVals.length > 1
+      ? Math.sqrt(spendVals.reduce((s, v) => s + (v - avgDailySpend) ** 2, 0) / spendVals.length)
+      : 0
+    const stdDevCtr = ctrVals.length > 1
+      ? Math.sqrt(ctrVals.reduce((s, v) => s + (v - avgDailyCtr) ** 2, 0) / ctrVals.length)
+      : 0
+    // Pull industry from workspace settings for adaptive thresholds
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId || "" },
+      select: { industry: true },
+    }).catch(() => null)
+    const alertConfig = deriveAlertConfig(
+      avgDailySpend * 30,
+      workspace?.industry || "default",
+      { avgDailySpend, avgDailyCtr, stdDevSpend, stdDevCtr }
+    )
+    const alerts = detectAdaptiveAlerts(metricPoints, alertConfig)
+      .filter((alert) => alert.metric !== "botScore" && alert.metric !== "reach")
+
     return NextResponse.json({
       ok: true,
       data: {
         connectedPlatforms,
         points,
-        alerts: detectAlerts(metricPoints).filter((alert) => alert.metric !== "botScore" && alert.metric !== "reach"),
+        alerts,
         hasVerifiedData: points.length > 0,
-        trust: "Metrics are sourced only from verified synced daily campaign rows.",
+        range,
+        trust: "Metrics are sourced only from verified synced daily campaign rows. Alerts use adaptive thresholds based on your account size and industry.",
       },
     })
   } catch (error: any) {

@@ -65,6 +65,10 @@ export async function POST(req: Request) {
     : 0
 
   const platformList = integrations.map((integration) => integration.platform).join(", ") || "None"
+  const isMeta = platformList.toLowerCase().includes("meta") || platformList.toLowerCase().includes("facebook")
+  const strategistLabel = isMeta
+    ? "performance marketing analyst and paid media strategist"
+    : "performance marketing analyst and Google Ads strategist"
   const campaignBreakdown = campaigns
     .map(
       (campaign) =>
@@ -76,13 +80,13 @@ export async function POST(req: Request) {
     )
     .join("\n")
 
-  const systemPrompt = `You are GROWZY AI, an expert performance marketing analyst and Google Ads strategist embedded inside GROWZZY OS - an AI marketing platform for SMMA agencies.
+  const systemPrompt = `You are GROWZY AI, an expert ${strategistLabel} embedded inside GROWZZY OS.
 
 You have access to the user's LIVE campaign data:
 
 ACCOUNT SUMMARY:
 - Total Campaigns: ${campaigns.length}
-- Total Spend (Last 30 days): ${money(totalSpend)}
+- Total Spend: ${money(totalSpend)}
 - Total Impressions: ${totalImpressions.toLocaleString()}
 - Total Conversions: ${totalConversions.toLocaleString()}
 - Average ROAS: ${avgRoas.toFixed(2)}x

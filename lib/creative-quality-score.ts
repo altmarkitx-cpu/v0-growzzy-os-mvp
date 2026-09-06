@@ -24,9 +24,32 @@ export type CreativeQualityScore = {
   }
   passed: boolean
   threshold: number
+  industry: string
 }
 
-const PASS_THRESHOLD = 70
+const DEFAULT_PASS_THRESHOLD = 70
+
+// Industry-specific weight profiles. B2B SaaS cares more about specificity
+// and less about emotional triggers; e-commerce cares more about emotional
+// triggers and less about sentence structure; local services care about
+// specificity and banned-phrase avoidance most.
+const INDUSTRY_WEIGHTS: Record<string, { angles: number; specificity: number; offer: number; emotion: number; banned: number; structure: number; threshold: number }> = {
+  "b2b-saas":        { angles: 0.20, specificity: 0.30, offer: 0.20, emotion: 0.05, banned: 0.15, structure: 0.10, threshold: 75 },
+  "ecommerce":       { angles: 0.20, specificity: 0.20, offer: 0.20, emotion: 0.25, banned: 0.10, structure: 0.05, threshold: 65 },
+  "local-services":  { angles: 0.15, specificity: 0.30, offer: 0.15, emotion: 0.10, banned: 0.25, structure: 0.05, threshold: 70 },
+  "finance":         { angles: 0.15, specificity: 0.25, offer: 0.15, emotion: 0.05, banned: 0.35, structure: 0.05, threshold: 80 },
+  "healthcare":      { angles: 0.15, specificity: 0.25, offer: 0.20, emotion: 0.10, banned: 0.25, structure: 0.05, threshold: 75 },
+  "default":         { angles: 0.25, specificity: 0.20, offer: 0.15, emotion: 0.15, banned: 0.15, structure: 0.10, threshold: DEFAULT_PASS_THRESHOLD },
+}
+
+function getWeightsForIndustry(industry: string | null | undefined) {
+  if (!industry) return INDUSTRY_WEIGHTS.default
+  const lower = industry.toLowerCase()
+  for (const [key, weights] of Object.entries(INDUSTRY_WEIGHTS)) {
+    if (key !== "default" && lower.includes(key)) return weights
+  }
+  return INDUSTRY_WEIGHTS.default
+}
 
 const ANGLE_KEYWORDS: Record<string, RegExp> = {
   pain_point: /\b(pain|frustrat|issue|problem|struggle|tired|hate|annoying|exhausted)\b/i,
@@ -43,15 +66,17 @@ export function scoreCreativeQuality(
   headlines: string[],
   descriptions: string[],
   offer: string,
-  brandToken?: string
+  brandToken?: string,
+  industry?: string,
 ): CreativeQualityScore {
+  const weights = getWeightsForIndustry(industry)
   const dims = {
-    angleCoverage: scoreAngleCoverage(headlines),
-    specificity: scoreSpecificity(headlines, descriptions),
-    offerPresence: scoreOfferPresence(headlines, descriptions, offer, brandToken),
-    emotionalTrigger: scoreEmotionalTrigger(headlines, descriptions),
-    bannedPhrases: scoreBannedPhrases(headlines, descriptions),
-    sentenceStructure: scoreSentenceStructure(descriptions),
+    angleCoverage: { ...scoreAngleCoverage(headlines), weight: weights.angles },
+    specificity: { ...scoreSpecificity(headlines, descriptions), weight: weights.specificity },
+    offerPresence: { ...scoreOfferPresence(headlines, descriptions, offer, brandToken), weight: weights.offer },
+    emotionalTrigger: { ...scoreEmotionalTrigger(headlines, descriptions), weight: weights.emotion },
+    bannedPhrases: { ...scoreBannedPhrases(headlines, descriptions), weight: weights.banned },
+    sentenceStructure: { ...scoreSentenceStructure(descriptions), weight: weights.structure },
   }
 
   const total = Math.round(
@@ -61,8 +86,9 @@ export function scoreCreativeQuality(
   return {
     total,
     dimensions: dims,
-    passed: total >= PASS_THRESHOLD,
-    threshold: PASS_THRESHOLD,
+    passed: total >= weights.threshold,
+    threshold: weights.threshold,
+    industry: industry || "default",
   }
 }
 

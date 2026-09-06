@@ -35,6 +35,7 @@ export async function PATCH(req: NextRequest) {
       ...(body.riskLevel !== undefined ? { riskLevel: body.riskLevel } : {}),
       ...(body.targetRoas !== undefined ? { targetRoas: body.targetRoas == null ? null : Number(body.targetRoas) } : {}),
       ...(body.maxCpa !== undefined ? { maxCpa: body.maxCpa == null ? null : Number(body.maxCpa) } : {}),
+      ...(body.dailyBudgetCeiling !== undefined ? { dailyBudgetCeiling: body.dailyBudgetCeiling == null ? null : Number(body.dailyBudgetCeiling) } : {}),
       ...(body.notificationPrefs !== undefined ? { notificationPrefs: body.notificationPrefs } : {}),
     },
     create: {
@@ -44,6 +45,7 @@ export async function PATCH(req: NextRequest) {
       riskLevel: body.riskLevel || "BALANCED",
       targetRoas: body.targetRoas == null ? null : Number(body.targetRoas),
       maxCpa: body.maxCpa == null ? null : Number(body.maxCpa),
+      dailyBudgetCeiling: body.dailyBudgetCeiling == null ? null : Number(body.dailyBudgetCeiling),
       notificationPrefs: body.notificationPrefs ?? undefined,
     },
   })

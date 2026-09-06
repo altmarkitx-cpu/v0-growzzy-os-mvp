@@ -65,7 +65,7 @@ export function classifyChatError(error: unknown): { kind: ChatErrorKind; messag
     return { kind: "rate-limit", message: "Rate limited. Wait a few seconds and Retry." };
   }
   if (text.includes("fetch") || text.includes("network") || status >= 500) {
-    return { kind: "network", message: "Connection problem reaching Growzzy. Retry." };
+    return { kind: "network", message: "Connection problem. Retry." };
   }
-  return { kind: "unknown", message: raw || "Growzzy couldn't answer — Retry." };
+  return { kind: "unknown", message: raw || "Something went wrong — Retry." };
 }

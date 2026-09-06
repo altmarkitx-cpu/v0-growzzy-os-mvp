@@ -1618,7 +1618,8 @@ Rendering high-resolution commercial ad creative mockup...`}
                 const el = e.currentTarget
                 if (el.dataset.fallback === "1") return
                 el.dataset.fallback = "1"
-                el.src = "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1080&q=80"
+                el.src = ""
+                el.style.display = "none"
               }}
             />
           ) : (
@@ -1747,17 +1748,11 @@ function CampaignCard({
     if (Array.isArray(c.headlines) && c.headlines.length > 0) {
       return c.headlines.map((h) => (typeof h === "string" ? h : (h as any)?.text ?? ""));
     }
-    return [
-      "Deploy Multi-Agent AI in 48h",
-      "Enterprise AI Infrastructure",
-      "Cut Ops Overhead by 40%",
-    ];
+    return [];
   }, [c.headlines]);
 
   const basePrimaryText: string = useMemo(
-    () =>
-      c.primaryText ||
-      "Automate mission-critical business workflows with custom multi-agent architecture. Enterprise security with zero data retention.",
+    () => c.primaryText || "",
     [c.primaryText],
   );
 
@@ -1772,7 +1767,7 @@ function CampaignCard({
   // While NOT editing, follow the streamed base values so updates flow in.
   const headlines = editedHeadlines ?? baseHeadlines;
   const primaryText = editedPrimaryText ?? basePrimaryText;
-  const budget = editedBudget ?? c.budgetDaily ?? 100;
+  const budget = editedBudget ?? c.budgetDaily ?? null;
 
   const artifactData: ArtifactData = {
     title: c.name,
@@ -1803,7 +1798,7 @@ function CampaignCard({
             name: c.name,
             platform: c.platform?.toUpperCase().includes("META") ? "META" : "GOOGLE",
             objective: c.objective || "LEADS",
-            budgetDaily: Number(budget) || 50,
+            budgetDaily: budget != null ? Number(budget) : undefined,
             currency: "USD",
             bidding: c.bidding || "maximize conversions",
             schedule: c.schedule || undefined,
@@ -1972,13 +1967,13 @@ function CampaignCard({
                 <span className="font-mono text-foreground text-sm">{c.currency}</span>
                 <Input
                   type="number"
-                  value={budget}
-                  onChange={(e) => setEditedBudget(Number(e.target.value))}
+                  value={budget ?? ""}
+                  onChange={(e) => setEditedBudget(e.target.value ? Number(e.target.value) : null)}
                   className="h-7 w-24 text-xs font-mono"
                 />
               </div>
             ) : (
-              <span className="font-medium text-foreground">{c.currency} {budget}</span>
+              <span className="font-medium text-foreground">{c.currency} {budget != null ? budget : "—"}</span>
             )}
           </div>
           <Field label="Bidding" value={c.bidding} />

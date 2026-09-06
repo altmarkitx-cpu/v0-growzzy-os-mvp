@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { resolveUserId } from "@/lib/resolve-user"
 import { getRequestWorkspaceId } from "@/lib/workspace"
 import { verifiedMetricCampaignWhere } from "@/lib/data-trust"
-import { buildDailyBriefFromCampaigns } from "@/lib/daily-brief"
+import { buildAdaptiveDailyBrief } from "@/lib/adaptive-daily-brief"
 import { getActiveAdAccountScope } from "@/lib/account-scope"
 
 export const dynamic = "force-dynamic"
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     campaigns.map((campaign) => [campaign.id, { id: campaign.id, name: campaign.name, platform: campaign.platform }])
   )
 
-  const brief = buildDailyBriefFromCampaigns(campaigns)
+  const brief = await buildAdaptiveDailyBrief(campaigns)
   const hookCounts = new Map<string, number>()
   for (const creative of creatives) {
     for (const variation of asArray(creative.variations)) {
@@ -89,7 +89,15 @@ export async function GET(req: NextRequest) {
       clicks: creative.clicks,
       createdAt: creative.createdAt,
     })),
-    fatigueAlerts: brief.creativeFatigueAlerts,
+    // Pull adaptive brief fields
+    fatigueAlerts: (brief as any).creativeFatigueAlerts ?? [],
+    scaleReady: (brief as any).scaleReady ?? [],
+    moneyWasted: (brief as any).moneyWasted ?? null,
+    accountHealth: (brief as any).accountHealth ?? null,
+    briefArchetype: brief.archetype,
+    briefSummary: brief.summary,
+    briefSections: brief.sections,
+    recommendations: (brief as any).recommendations ?? [],
     scoreLeaders: creatives.slice(0, 10).map((creative) => ({
       id: creative.id,
       score: creative.score,

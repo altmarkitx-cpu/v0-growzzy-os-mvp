@@ -58,7 +58,33 @@ export async function webSearch(query: string, limit = 6): Promise<SearchResult[
 /** Reads a live page and returns readable text (capped). Returns null on failure. */
 export async function fetchPageText(url: string, cap = 8000): Promise<string | null> {
   try {
-    const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "text/html" } });
+    // SSRF protection: validate URL before fetching
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return null
+    }
+    // Block private IPs, localhost, and internal networks
+    const hostname = parsedUrl.hostname.toLowerCase()
+    const BLOCKED_HOSTNAMES = [
+      "localhost", "127.0.0.1", "0.0.0.0", "::1",
+      ...Array.from({ length: 256 }, (_, i) => `127.0.0.${i}`),
+      ...Array.from({ length: 256 }, (_, i) => `10.${i}.0.0`),
+      ...Array.from({ length: 256 }, (_, i) => `192.168.${i}.0`),
+      ...Array.from({ length: 256 }, (_, i) => `172.16.${i}.0`),
+    ]
+    // Block cloud metadata endpoints
+    const BLOCKED_PATHS = ["/latest/meta-data/", "/metadata/", "/.aws/"]
+    if (BLOCKED_HOSTNAMES.some((h) => hostname === h || hostname.endsWith(`.${h}`))) return null
+    if (BLOCKED_PATHS.some((p) => parsedUrl.pathname.startsWith(p))) return null
+    // Only allow http/https
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) return null
+
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, Accept: "text/html" },
+      signal: AbortSignal.timeout(8000),
+    });
     if (!res.ok) return null;
     const html = await res.text();
     const text = html

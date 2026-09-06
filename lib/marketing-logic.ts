@@ -68,7 +68,35 @@ export type RuleRecommendation = {
   confidence: number
 }
 
-const SEARCH_CTR_BENCHMARK = 3.17
+// Platform-aware CTR benchmarks (industry-typical for high-traffic accounts)
+// Risk-level multipliers adjust the threshold for flagging underperformance.
+// Aggressive: tighten threshold (1.0x), Conservative: loosen (0.8x)
+const CTR_BENCHMARKS: Record<string, number> = {
+  GOOGLE: 3.17,
+  META: 0.90,
+  FACEBOOK: 0.90,
+  INSTAGRAM: 0.70,
+}
+const RISK_MULTIPLIERS: Record<string, number> = {
+  AGGRESSIVE: 1.0,
+  BALANCED: 0.85,
+  CONSERVATIVE: 0.7,
+}
+
+function platformCtrBenchmark(platform?: string | null, riskLevel?: string | null) {
+  const base = (() => {
+    if (!platform) return CTR_BENCHMARKS.GOOGLE
+    const key = Object.keys(CTR_BENCHMARKS).find((k) => platform.toUpperCase().includes(k.toLowerCase()))
+    return key ? CTR_BENCHMARKS[key] : CTR_BENCHMARKS.GOOGLE
+  })()
+  const multiplier = RISK_MULTIPLIERS[riskLevel ?? "BALANCED"] ?? 0.85
+  return base * multiplier
+}
+function platformLabel(platform?: string | null) {
+  if (!platform) return "search"
+  if (/meta|facebook|instagram/i.test(platform)) return "social"
+  return "search"
+}
 const MIN_SIGNAL_SPEND = 100
 
 function n(value: unknown) {
@@ -116,7 +144,11 @@ export function calculateAccountAverages(campaigns: CampaignSignal[]): AccountAv
   }
 }
 
-export function analyzeCampaigns(campaigns: CampaignSignal[], averages = calculateAccountAverages(campaigns)): CampaignAnalysis[] {
+export function analyzeCampaigns(
+  campaigns: CampaignSignal[],
+  averages = calculateAccountAverages(campaigns),
+  riskLevel?: string | null
+): CampaignAnalysis[] {
   return campaigns.map((campaign) => {
     const spend = n(campaign.spend)
     const budget = n(campaign.budgetAmount)
@@ -129,14 +161,15 @@ export function analyzeCampaigns(campaigns: CampaignSignal[], averages = calcula
     const conversionRate = clicks > 0 ? (conversions / clicks) * 100 : 0
     const roasVsAverage = averages.avgRoas > 0 ? campaignRoas / averages.avgRoas : 0
     const cpcVsAverage = averages.avgCpc > 0 ? campaignCpc / averages.avgCpc : 0
-    const ctrVsBenchmark = SEARCH_CTR_BENCHMARK > 0 ? campaignCtr / SEARCH_CTR_BENCHMARK : 0
+    const ctrBenchmark = platformCtrBenchmark(campaign.platform, riskLevel)
+    const ctrVsBenchmark = ctrBenchmark > 0 ? campaignCtr / ctrBenchmark : 0
     const flags: string[] = []
 
     if (spend > MIN_SIGNAL_SPEND && conversions === 0) flags.push("ZERO_CONVERSIONS_WITH_SPEND")
     if (averages.avgRoas > 0 && campaignRoas > 0 && campaignRoas < averages.avgRoas * 0.7) flags.push("ROAS_BELOW_ACCOUNT_AVERAGE")
     if (averages.avgRoas > 0 && campaignRoas > averages.avgRoas * 1.35) flags.push("ROAS_ABOVE_ACCOUNT_AVERAGE")
     if (averages.avgCpc > 0 && campaignCpc > averages.avgCpc * 1.3) flags.push("HIGH_CPC")
-    if (campaignCtr > 0 && campaignCtr < SEARCH_CTR_BENCHMARK * 0.7) flags.push("CTR_BELOW_BENCHMARK")
+    if (campaignCtr > 0 && campaignCtr < ctrBenchmark * 0.7) flags.push("CTR_BELOW_BENCHMARK")
     if (budget > 0 && budgetUtilization > 0.9 && campaignRoas >= averages.avgRoas) flags.push("BUDGET_LIMITED_WINNER")
     if (!campaign.hasCreative) flags.push("NO_CREATIVE_ATTACHED")
 
@@ -152,7 +185,7 @@ export function analyzeCampaigns(campaigns: CampaignSignal[], averages = calcula
 
     const creativeRiskScore =
       (!campaign.hasCreative ? 40 : 0) +
-      (campaignCtr > 0 ? Math.max(0, 1 - campaignCtr / SEARCH_CTR_BENCHMARK) * 35 : 20) +
+      (campaignCtr > 0 ? Math.max(0, 1 - campaignCtr / ctrBenchmark) * 35 : 20) +
       (clicks > 250 && conversions === 0 ? 25 : 0)
 
     return {
@@ -170,8 +203,8 @@ export function analyzeCampaigns(campaigns: CampaignSignal[], averages = calcula
   })
 }
 
-export function buildRuleRecommendations(campaigns: CampaignSignal[], averages = calculateAccountAverages(campaigns)): RuleRecommendation[] {
-  const analyzed = analyzeCampaigns(campaigns, averages)
+export function buildRuleRecommendations(campaigns: CampaignSignal[], averages = calculateAccountAverages(campaigns), riskLevel?: string | null): RuleRecommendation[] {
+  const analyzed = analyzeCampaigns(campaigns, averages, riskLevel)
   const recommendations: RuleRecommendation[] = []
 
   for (const campaign of analyzed) {
@@ -233,7 +266,7 @@ export function buildRuleRecommendations(campaigns: CampaignSignal[], averages =
         campaignName: campaign.name,
         externalId: campaign.externalId,
         title: "Refresh ad creative",
-        reasoning: `${campaign.name} has ${pct(campaignCtr)} CTR versus the ${pct(SEARCH_CTR_BENCHMARK)} search benchmark${campaign.hasCreative ? "" : " and no saved creative in GROWZZY OS"}.`,
+        reasoning: `${campaign.name} has ${pct(campaignCtr)} CTR versus the ${pct(platformCtrBenchmark(campaign.platform, riskLevel))} ${platformLabel(campaign.platform)} benchmark${campaign.hasCreative ? "" : " and no saved creative in GROWZZY OS"}.`,
         currentValue: `${pct(campaignCtr)} CTR`,
         recommendedValue: "Generate new ad angles",
         expectedImpact: "Improve click quality and reduce CPC with fresher, more relevant creative.",
@@ -310,8 +343,8 @@ export function scoreCreativeVariation(input: {
   }
 }
 
-export function calculateAuditScores(campaigns: CampaignSignal[], averages = calculateAccountAverages(campaigns)) {
-  const analyzed = analyzeCampaigns(campaigns, averages)
+export function calculateAuditScores(campaigns: CampaignSignal[], averages = calculateAccountAverages(campaigns), riskLevel?: string | null) {
+  const analyzed = analyzeCampaigns(campaigns, averages, riskLevel)
   const waste = analyzed.reduce((sum, campaign) => sum + campaign.wasteScore, 0) / Math.max(1, analyzed.length)
   const creativeRisk = analyzed.reduce((sum, campaign) => sum + campaign.creativeRiskScore, 0) / Math.max(1, analyzed.length)
   const budgetEfficiency = Math.max(0, Math.min(100, 100 - waste))

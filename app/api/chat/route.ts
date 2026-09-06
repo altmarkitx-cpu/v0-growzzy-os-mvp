@@ -11,10 +11,44 @@ import {
   createAIProvider,
   generateAdImage,
 } from "@/lib/ai-gateway.server";
-import { BANNED_FILLER_PHRASES } from "@/lib/google-plan-quality";
+import { BANNED_FILLER_PHRASES, isPhraseAllowedForIndustry } from "@/lib/google-plan-quality";
 import { rateLimitPolicy, rateLimitResponse } from "@/lib/rate-limit";
 
 export const maxDuration = 120;
+
+// Wraps a primary model so that on rate-limit errors it transparently
+// falls back to a secondary model. The user keeps getting responses; the
+// model just degrades. The AI SDK accepts LanguageModelV1, so we forward
+// every call to the primary unless it throws a 429.
+function wrapWithFallback(
+  primary: ReturnType<ReturnType<typeof createAIProvider>["provider"]>,
+  secondary: ReturnType<ReturnType<typeof createAIProvider>["provider"]>,
+) {
+  const handler: ProxyHandler<typeof primary> = {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver)
+      if (typeof value === "function") {
+        return async (...args: unknown[]) => {
+          try {
+            return await (value as (...a: unknown[]) => Promise<unknown>).apply(target, args)
+          } catch (err: unknown) {
+            const e = err as { statusCode?: number; code?: string }
+            if (e?.statusCode === 429 || e?.code === "rate_limit_exceeded") {
+              console.warn("[growzzy] primary model rate-limited, falling back to mini")
+              const fallbackValue = Reflect.get(secondary, prop, secondary as object)
+              if (typeof fallbackValue === "function") {
+                return await (fallbackValue as (...a: unknown[]) => Promise<unknown>).apply(secondary, args)
+              }
+            }
+            throw err
+          }
+        }
+      }
+      return value
+    },
+  }
+  return new Proxy(primary, handler) as typeof primary
+}
 
 const SYSTEM = `You are Growzzy, the AI Chief Media Buyer inside Growzzy OS — a senior performance marketer with 12+ years scaling $50M+ across B2B SaaS and DTC. You think like a strategist, write like a direct-response copywriter, and never give a textbook answer when a worked example grounded in the user's actual business is possible.
 
@@ -41,31 +75,18 @@ WORKFLOW DISCIPLINE (read carefully — these are enforced server-side)
 - A campaign without a landingPage URL will be rejected at launch. Always include one.
 
 ============================================================
-STEP 0: INTENT ROUTING (mandatory before any other action)
+AGENTIC BEHAVIOR (use freely — no fixed funnel)
 ============================================================
-On the latest user message, classify the intent into exactly ONE of these four modes and stay in that mode for the entire turn. Do NOT default to CAMPAIGN_BUILD.
+You are a senior marketing strategist, not a dropdown-menu bot. Use the available tools freely to serve the user:
+- Need data? → getMyAnalytics / getMyCampaigns / getMyLeads / getMyRecommendations
+- Need market intel? → research (with real queries) / analyzeWebsite
+- Need user input? → askUser (1-2 questions, derived from what's missing, not a template)
+- Need to build? → proposePlan (flexible structure) → deliverCampaign
+- Need creativity? → generateCreative
+- User asks a theory question? → Answer directly, teach with one example, ask one grounding question.
+- User says "hi" or thanks? → Respond briefly, ask one sharp marketing question to keep conversation productive.
 
-1) ACCOUNT_INSIGHT — user asks to review, inspect, audit, or analyze their existing campaigns / leads / spend / performance ("check my campaign records", "what's my ROAS", "are my leads good", "how is X campaign doing", "audit my account").
-   → Call getMyAnalytics / getMyCampaigns / getMyLeads / getMyRecommendations to pull live data.
-   → Then deliver a sharp, opinionated diagnosis in plain prose: total spend + revenue + ROAS, top 1-2 campaigns by ROAS, bottom 1-2 by ROAS, 2-3 specific improvements tied to the numbers.
-   → NEVER say "I can't access" — you have these tools, use them.
-   → End with one concrete next step ("Want me to rewrite the bottom campaign's headlines?" or "Should I generate a 2nd campaign to diversify spend?").
-
-2) LEARN — user asks a marketing theory question, asks to be taught, says they're new to marketing, asks "what is X", asks how a channel works ("teach me marketing like I'm 5", "what is a campaign", "how does Google bidding work", "what's a good CPC").
-   → Teach with ONE concrete worked example grounded in the user's brand (use brand context; if missing, fall back to a relatable B2B service example).
-   → Use the structure: short definition (1 line) → real example (3-4 lines) → why it matters for THEIR business (1-2 lines) → ONE grounding question at the end so the next turn can apply the concept to their actual situation.
-   → DO NOT call askUser, previewExecution, research, proposePlan, or any campaign tool. This is a teaching turn, not a build turn.
-   → If the user's question naturally leads to a campaign ("how do I get more leads?"), teach the underlying concept first THIS turn, then offer to build next turn.
-
-3) CASUAL — greetings, "how are you", thank-yous, off-topic chat.
-   → Respond in 1-2 sentences with personality.
-   → End with ONE sharp marketing question to keep the conversation productive ("Quick one — what's the #1 thing you're trying to grow right now?").
-
-4) CAMPAIGN_BUILD — user explicitly says "build", "create", "launch", "set up", "make me a campaign", "I want to run ads for X", "generate a campaign for Y", or asks for a specific ad deliverable ("write me 5 headlines", "give me ad copy").
-   → Follow the CAMPAIGN BUILD WORKFLOW (steps 1-6 below).
-   → This is the ONLY mode that may call askUser, previewExecution, research, proposePlan, generateCreative, or deliverCampaign.
-
-If the message is genuinely ambiguous, prefer LEARN on the first turn. Do NOT force a brand-new user into the build funnel before they've learned the basics.
+Do NOT follow a rigid 6-step funnel. Do NOT ask the same 3 questions every time. Derive questions from the user's message and brand context. If you can infer an answer, don't ask. If the user asks anything marketing-related, answer and do the work — don't force them into a template.
 
 ============================================================
 CAMPAIGN BUILD WORKFLOW (mode 4 only — do not run any of this in other modes)
@@ -89,93 +110,31 @@ For each question you DO ask, provide 3-4 options that are specific to the user'
 PLATFORM POLICY: Growzzy currently supports **Google Ads only** (Search + Display/Discovery image formats). Do NOT ask about Meta, TikTok, LinkedIn, or any other network — assume Google Ads and proceed. Do NOT offer a "Multi-Channel" option since we don't yet support it.
 
 3. EXECUTION PLAN PREVIEW (previewExecution):
-MANDATORY: After the user submits askUser answers, BEFORE running any other tool, call previewExecution to render an "Execution Plan" card. The card lists 3-5 generic activity steps (e.g. "Researching your market", "Building the strategy document", "Writing high-converting ad copy", "Generating the ad creative").
-- Use PLAIN ACTIVITY LABELS — never role names like "Performance Marketing" or "Creative Director".
-- The card has a "Proceed with plan" button and a 10s auto-proceed countdown. The model continues to step 4 only after the user clicks Proceed OR the countdown fires.
-- Wait for the tool result before proceeding. Do NOT call research in the same turn as previewExecution.
+Call previewExecution when the user asks to build/run/launch a campaign and you have enough info to start. The card lists 3-5 activity steps SPECIFIC to this campaign's actual work. Derive the activity labels from the real work (e.g. for a B2B SaaS lead-gen campaign, the activities might be 'Researching your B2B SaaS competitors', 'Building keyword lists for enterprise buyers', 'Drafting your direct response copy'). The card has a 'Proceed with plan' button and a 10s auto-proceed countdown. The model continues only after the user clicks Proceed or the countdown fires.
 
-4. MANDATORY MARKET RESEARCH (research):
-After the user proceeds (or 10s elapses), run live web research before proposing the strategy plan.
-- Call the research tool with 3-5 real search queries specific to this industry, competitors, high-intent keywords, and real CPC benchmarks.
-- Ground every claim, keyword cluster, and benchmark in the research findings. NEVER hallucinate benchmarks.
+4. RESEARCH (research):
+When building a campaign, call the research tool with 3-5 real queries specific to this industry, competitors, high-intent keywords, and CPC benchmarks. Ground every claim and benchmark in the research findings. NEVER hallucinate benchmarks. If research returns nothing, use internal knowledge but mark numbers as 'industry typical' and note that the user should verify.
 
 5. EXECUTION BLUEPRINT (proposePlan):
-Synthesize the research into an execution blueprint via proposePlan. The blueprint is the user's build sheet — they open Google Ads Manager and follow it line by line.
+Synthesize research into an execution blueprint via proposePlan. The blueprint is the user's build sheet — they open Google Ads Manager and follow it line by line.
 
-Use the canonical 7-section blueprint as the DEFAULT structure, but TAILOR it to the user's actual business. Drop or rename sections when the user's situation makes them irrelevant (e.g. a local-services business doesn't need Detailed Targeting interest layers; a B2B SaaS doesn't need Locations beyond country-level).
+Structure the document to match the campaign type (Search RSA, Display image ad, B2B lead gen, e-commerce, local services, etc.). Do NOT force the same 7 sections on every campaign. Drop or rename sections when irrelevant to the user's situation. Use Setting|Value|Why markdown tables (with proper |---| separator rows) and bold **CRITICAL:** callouts where they matter. End with **Go Live.** as the final line.
 
-CANONICAL STRUCTURE (default, adapt as needed):
-
-# 1. Campaign Level Settings
-Open Google Ads Manager. Click "Create." Set up exactly as follows:
-| Setting | Value | Why |
-Then 2-3 specific **CRITICAL:** callouts about campaign-level toggles that catch beginners (Advantage Campaign Budget, budget optimization, A/B test, campaign name).
-
-# 2. Ad Set Level Settings
-## 2.1 Budget & Schedule
-| Setting | Value | Why |
-## 2.2 Audience (Manual Targeting Only)
-| Setting | Value | Why |
-## 2.3 Demographics
-| Setting | Value | Why |
-## 2.4 Locations
-Table of PRIMARY / ADD IF NEEDED cities with a Why column.
-## 2.5 Detailed Targeting (Interest + Behavior Layers)
-Layer 1: Industry Signal — table of interests/behaviors.
-Layer 2: Business Owner Signal — table with Type | Name | Where to Find.
-TIPS at the end of each layer.
-## 2.6 Exclusions
-| Category | Exclude These | Why |
-## 2.7 Placements
-| Placement | Status | Why |
-
-# 3. Ad Level Settings
-## 3.1 Ad Setup
-| Setting | Value | Why |
-## 3.2 Primary Text Variations
-3 fully-written primary text variations — the user can paste them directly into Google Ads.
-## 3.3 Headlines
-Table of 10-15 numbered headlines (Google Search RSA).
-## 3.4 Description
-Table of 3-4 numbered descriptions.
-## 3.5 CTA Button & Final URL
-| Setting | Value |
-
-# 4. Conversion Tracking Checklist
-Numbered list of the EXACT steps to set up the conversion tracking before launching.
-
-# 5. Week-by-Week Optimization
-## Week 1: Launch + Learn
-## Week 2: First Cut
-## Week 3: Optimize
-## Week 4: Review + Plan Month 2
-Each week: 3-5 bullet points with specific actions, specific numbers, specific thresholds.
-
-# 6. KPI Targets
-| Metric | Target | Red Flag |
-
-# 7. Pre-Launch Checklist
-15-20 numbered items. Bold the CRITICAL ones (Advantage+, language, budget cap, conversion tracking, ad policy review).
-
-End every doc with **Go Live.** as the final line.
-
-FORMATTING RULES (these are what make the doc look like an actual build sheet, not consulting prose):
+FORMATTING RULES:
 - Every Setting|Value|Why table MUST have a |---|---|---| separator row. A missing separator breaks the renderer.
-- Every value must be EXACT (no "a modest budget" → use "₹1,000/day"; no "good volume" → use "12-16 conversions/day").
+- Every value must be EXACT (no "a modest budget" → use "$100/day"; no "good volume" → use "12-16 conversions/day").
 - Every table cell that contains a pipe character must escape it as \\| or the table breaks.
-- Bold **CRITICAL:** callouts go immediately after the relevant section, not in a separate appendix.
+- Bold **CRITICAL:** callouts go immediately after the relevant section.
 - Tables for settings, bullet lists for actions, prose only to explain WHY a setting exists.
 
-CRITICAL: Call proposePlan EXACTLY ONCE with the full markdownPlan. Do NOT dump the strategy as raw markdown text in the conversation. The tool renders a proper strategy document card with an Approve button — that's the only way the strategy should reach the user. Free-text prose after research is a UX bug.
-
-STOP and wait for the user to click "Approve Strategy & Build Campaign" or request adjustments.
+Call proposePlan EXACTLY ONCE with the full markdownPlan. Do NOT dump the strategy as raw markdown text in the conversation. The tool renders a proper strategy document card with an Approve button.
 
 6. ASSET GENERATION & LAUNCH PACKAGE (generateCreative & deliverCampaign):
 Once approved (approved=true):
 - GOOGLE SEARCH CAMPAIGN (text-only RSA): Do NOT call generateCreative. Immediately call deliverCampaign with 15 headlines (<= 30 chars), 4 descriptions (<= 90 chars), 4 Sitelink extensions, negative keywords, targeting setup.
 - GOOGLE DISPLAY / DISCOVERY IMAGE AD: Call generateCreative ONCE for the 1:1 image, then call deliverCampaign with 1 short headline (<= 40 chars), 1 description (<= 90 chars), Final URL, CTA, targeting setup.
 
-NEVER generate Meta-specific fields (no OUTCOME_LEADS, no Facebook/Instagram targeting, no Meta pixel). The user is building on Google Ads only.
+If the user hasn't told you a budget, ask for it via askUser before calling deliverCampaign. Do NOT invent a budget number.
 
 ============================================================
 COPYWRITING QUALITY & BANNED PHRASES
@@ -219,17 +178,17 @@ const questionSchema = z.object({
             z.object({
               label: z.string(),
               description: z.string(),
-              recommended: z.boolean(),
+              recommended: z.boolean().optional().describe("mark exactly one option as recommended if you have a clear pick"),
             }),
           )
-          .min(3)
-          .max(4)
-          .describe("3-4 options per question, exactly one marked recommended"),
+          .min(2)
+          .max(5)
+          .describe("2-5 options per question"),
       }),
     )
-    .min(3)
-    .max(4)
-    .describe("3-4 strategic setup questions tailored to the user's specific business — at minimum cover budget, conversion action, and platform. If brand context is missing landing page or timing, ask those too."),
+    .min(1)
+    .max(2)
+    .describe("1-2 questions at a time — ask only what is genuinely missing. Derive each question from the user's message and brand context; do not ask what you can infer."),
 });
 
 /** Replaces base64 creative data URLs in history with a short placeholder. */
@@ -402,7 +361,12 @@ export async function POST(req: Request) {
     const { webSearch, fetchPageText } = await import("@/lib/research.server");
 
     const gateway = createAIProvider(apiKey);
-    const model = gateway.provider(gateway.chatModel);
+    const primaryModel = gateway.provider(gateway.chatModel);
+    // Fallback model: when the primary hits rate limits, fall back to a
+    // cheaper/faster model so the chat doesn't crash. The user experience
+    // degrades (less depth) but stays online.
+    const fallbackModel = gateway.provider("gpt-4o-mini");
+    const model = wrapWithFallback(primaryModel, fallbackModel);
 
     // Forward the user's auth cookie when the chat route internally calls
     // other /api/* endpoints on the same origin. Used by the getMy* tools
@@ -447,18 +411,22 @@ export async function POST(req: Request) {
             "Run live web research: performs web searches, reads actual result pages, and returns analyzed market/competitor intelligence.",
           inputSchema: z.object({
             focus: z.string().describe("what is being researched, shown to the user"),
-            topics: z.array(z.string()).describe("3-6 research topics"),
+            topics: z.array(z.string()).describe("1-8 research topics — use more for deeper research"),
             queries: z
               .array(z.string())
-              .describe("2-5 real web search queries to run, specific to this business"),
+              .describe("1-8 real web search queries to run, specific to this business. Use 1-2 for quick checks, 5-8 for full competitive analysis."),
           }),
           execute: async ({ focus, topics, queries }) => {
+            // Adaptive limits: scale research depth with query count.
+            const queryLimit = Math.min(queries.length, 8)
+            const resultLimit = queries.length <= 2 ? 3 : queries.length <= 4 ? 5 : 6
+            const urlLimit = queries.length <= 2 ? 3 : queries.length <= 4 ? 5 : 7
             const searches = await Promise.all(
-              queries.slice(0, 5).map(async (q) => ({ q, results: await webSearch(q, 5) })),
+              queries.slice(0, queryLimit).map(async (q) => ({ q, results: await webSearch(q, resultLimit) })),
             );
             const urls = [
               ...new Set(searches.flatMap((s) => s.results.slice(0, 2).map((r) => r.url))),
-            ].slice(0, 5);
+            ].slice(0, urlLimit);
             const pages = await Promise.all(urls.map((u) => fetchPageText(u, 4000)));
 
             const evidence = [
@@ -653,13 +621,13 @@ export async function POST(req: Request) {
 
         askUser: tool({
           description:
-            "Ask the user strategic setup questions as a clickable card-based UI. ALWAYS use this tool — never write questions as plain text. Derive each question from what the user's message is missing (audience, geography, budget, conversion action, offer, urgency, competitive context, etc.). Each question gets 3-4 options tailored to the user's business; the model picks the option it would recommend based on the brand context and reasoning it can show in the description. Exactly ONE option per question should be marked recommended:true.",
+            "Ask the user 1-2 questions when you genuinely need input — never write questions as plain text. Derive each question from what the user's message is missing (audience, geography, budget, conversion action, offer, urgency, competitive context, etc.). Each question gets 2-5 options tailored to the user's business; mark exactly one option as recommended:true only if you have a clear pick based on the brand context. If you can infer the answer from context or brand profile, do NOT ask — move on.",
           inputSchema: questionSchema,
         }),
 
         previewExecution: tool({
           description:
-            "MANDATORY: After the user answers askUser, call this tool BEFORE research to show the user an Execution Plan card. The card lists 3-5 upcoming activities that are about to run for THIS specific campaign. Derive the activity labels from the actual work the model is about to do (e.g. if the campaign is a B2B SaaS lead-gen campaign, the activities might be 'Analyzing your B2B SaaS competitors', 'Building keyword lists for enterprise buyers', 'Drafting your LinkedIn-style direct response copy'). The card has a 'Proceed with plan' button and a 10s auto-proceed countdown. The model only continues after the user clicks Proceed or the countdown fires.",
+            "Show the user an Execution Plan card when the work involves 3+ steps (research, build, launch). Skip for simple asks like 'write me 5 headlines' or 'what's my ROAS'. The card lists 2-7 upcoming activities SPECIFIC to this campaign. Derive activity labels from the actual work (e.g. for a B2B SaaS lead-gen campaign: 'Analyzing your B2B SaaS competitors', 'Building keyword lists for enterprise buyers', 'Drafting your direct response copy'). The card has a 'Proceed with plan' button and a 10s auto-proceed countdown. The model only continues after the user clicks Proceed or the countdown fires.",
           inputSchema: z.object({
             title: z.string().describe("Short plan title specific to the campaign, e.g. the campaign's objective plus channel"),
             summary: z.string().describe("One-line summary specific to what this run will produce"),
@@ -670,9 +638,9 @@ export async function POST(req: Request) {
                   description: z.string().describe("One-line description of what this step produces."),
                 }),
               )
-              .min(3)
-              .max(5)
-              .describe("3-5 upcoming activities"),
+              .min(2)
+              .max(7)
+              .describe("2-7 upcoming activities"),
           }),
           execute: async (input) => ({ proceed: false, ...input }),
         }),
@@ -685,8 +653,8 @@ export async function POST(req: Request) {
             summary: z.string().describe("Executive summary of campaign approach and core objective"),
             platform: z.enum(["GOOGLE"]).describe("Target ad network platform. Growzzy currently supports Google Ads only (Search + Display image formats)."),
             targetAudience: z.string().describe("Primary ICP role & company profile"),
-            budgetRecommendation: z.string().describe("Recommended daily/monthly budget with allocation"),
-            markdownPlan: z.string().describe("EXECUTION BLUEPRINT — the user's build sheet for Google Ads Manager. MUST follow this exact 7-section structure with Setting|Value|Why markdown tables (with proper |---| separator rows) and bold **CRITICAL:** callouts: 1. Campaign Level Settings, 2. Ad Set Level Settings (Budget & Schedule, Audience, Demographics, Locations, Detailed Targeting, Exclusions, Placements), 3. Ad Level Settings (Primary Text Variations, Headlines RSA, Description, CTA & Final URL), 4. Conversion Tracking Checklist, 5. Week-by-Week Optimization (Week 1 Launch+Learn, Week 2 First Cut, Week 3 Optimize, Week 4 Review+Plan Month 2), 6. KPI Targets (Metric|Target|Red Flag), 7. Pre-Launch Checklist (15-20 numbered items). End with **Go Live.** Every Setting|Value|Why table MUST have a |---| separator row with one cell per column. End the document with a bold 'Go Live.' sign-off on its own line."),
+            budgetRecommendation: z.string().optional().describe("Recommended daily/monthly budget with allocation. OPTIONAL — if the user hasn't told you a budget, leave this blank and ask them for it before launching. Do NOT invent a number."),
+            markdownPlan: z.string().describe("EXECUTION BLUEPRINT — the user's build sheet for Google Ads Manager. Structure the document to match the campaign type (Search RSA, Display image ad, etc.) — do not force the same 7 sections for every campaign. Use Setting|Value|Why markdown tables (with proper |---| separator rows) and bold **CRITICAL:** callouts where they matter. End with **Go Live.** Every Setting|Value|Why table MUST have a |---| separator row with one cell per column. End the document with a bold 'Go Live.' sign-off on its own line."),
             steps: z.array(
               z.object({
                 title: z.string().describe("Execution milestone title"),
@@ -703,9 +671,10 @@ export async function POST(req: Request) {
             const md = String(input.markdownPlan || "").toLowerCase();
             const mdRaw = String(input.markdownPlan || "");
 
-            // 1. Exact banned phrase matches
+            // 1. Exact banned phrase matches (with industry allowlist)
+            const userIndustry = (input as { targetAudience?: string }).targetAudience || null
             for (const phrase of BANNED_FILLER_PHRASES) {
-              if (md.includes(phrase)) {
+              if (md.includes(phrase) && !isPhraseAllowedForIndustry(phrase, userIndustry)) {
                 issues.push(`BANNED PHRASE "${phrase}" found in strategy. Rewrite with specific numbers, named mechanisms, or quantified outcomes.`);
                 break;
               }
@@ -789,24 +758,37 @@ export async function POST(req: Request) {
               if (issues.length > 0 && issues[issues.length - 1].startsWith("Malformed table")) break;
             }
 
-            // 7. End the document with the Go Live sign-off.
-            if (md.length > 500 && !/go\s+live\.?/i.test(mdRaw.slice(-200))) {
-              issues.push(`Strategy document must end with a bold "Go Live." sign-off on its own line. This is the user's checklist completion cue.`);
+            // 7. End the document with the Go Live sign-off (only for full
+            //    strategy docs, not short briefs). Soft warning, not a block.
+            if (md.length > 1500 && !/go\s+live\.?/i.test(mdRaw.slice(-200))) {
+              issues.push(`Long strategy docs benefit from ending with a "Go Live." sign-off, but this is optional for shorter briefs.`);
             }
 
-            if (issues.length > 0) {
+            // Soft quality gate: surface issues as warnings, not rejections.
+            // The user can choose to revise or proceed. Only HARD blocks are
+            // the markdown table separator (renders as plain text otherwise)
+            // and a missing landing URL when one is required for launch.
+            const hardIssues = issues.filter((i) =>
+              i.startsWith("Malformed markdown table") ||
+              i.startsWith("No landing page URL"),
+            )
+            const warnings = issues.filter((i) => !hardIssues.includes(i))
+
+            if (hardIssues.length > 0) {
               return {
                 approved: false,
-                qualityIssues: issues,
+                qualityIssues: hardIssues,
+                warnings,
                 retryGuidance:
-                  "Your strategy was REJECTED for quality issues. Rewrite fixing all issues above. " +
-                  "Rules: (1) No generic corporate filler — use specific numbers, mechanisms, named outcomes. " +
-                  "(2) Bolded creative angles must be quantified or they get rejected. " +
-                  "(3) Always include a landing page URL. " +
-                  "Good examples: '48-Hour AI Agent Deployment', '60% Reduction in Pipeline Failures', 'Free Architecture Audit in 72 Hours', 'Cut $150K in Manual Ops'.",
+                  "Fix the table structure and add a landing page URL. " +
+                  "Banned phrases and bolded generic angles are now warnings — the user can override.",
               };
             }
-            return { approved: true, title: input.title };
+            return {
+              approved: true,
+              title: input.title,
+              warnings: warnings.length > 0 ? warnings : undefined,
+            };
           },
         }),
 
@@ -826,7 +808,7 @@ export async function POST(req: Request) {
             const { url, error } = await generateAdImage(apiKey, prompt, req.signal);
             return {
               caption,
-              imageUrl: url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1080&q=80",
+              imageUrl: url || null,
               error: error,
             };
           },
@@ -838,9 +820,9 @@ export async function POST(req: Request) {
             name: z.string().min(1).max(120),
             platform: z.literal("GOOGLE").describe("Always 'GOOGLE' — Growzzy only ships to Google Ads. Use 15 RSA headlines + 4 descriptions for Search, or 1 short headline + 1 description for a Display/Discovery image ad."),
             objective: z.string().min(1).max(40),
-            budgetDaily: z.number().min(1).max(100000),
+            budgetDaily: z.number().min(1).max(100000).optional().describe("Daily budget. Ask the user via askUser if not provided — do NOT invent a number."),
             currency: z.string().min(1).max(8).default("USD"),
-            bidding: z.string().min(1),
+            bidding: z.string().optional().describe("Bidding strategy. Default to MAXIMIZE_CONVERSIONS if not specified."),
             schedule: z.string().optional(),
             landingPage: z.string().url("Must be a valid https:// URL").describe("Required — ad will be rejected at launch without a destination URL."),
             offer: z.string().optional(),
@@ -868,25 +850,34 @@ export async function POST(req: Request) {
             risks: z.array(z.string()).optional(),
           }),
           execute: async (input) => {
-            // Server-side quality gate — block delivery and force regeneration
-            // when the output violates the copywriting rules.
-            const issues = validateDeliverCampaignInput(input as Record<string, unknown>);
-            if (issues.length > 0) {
+            // Server-side quality gate — surface issues as warnings, not hard
+            // blocks. The user can choose to revise or proceed. Only HARD
+            // blocks are missing required fields (landingPage, budget when
+            // provided, char limits that Google Ads will actually reject).
+            const allIssues = validateDeliverCampaignInput(input as Record<string, unknown>);
+            const hardIssues = allIssues.filter((i) =>
+              i.startsWith("Landing page URL is required") ||
+              i.startsWith("Landing page must be a valid") ||
+              i.startsWith("HEADLINE") && i.includes("chars") ||
+              i.startsWith("DESCRIPTION") && i.includes("chars"),
+            );
+            const warnings = allIssues.filter((i) => !hardIssues.includes(i));
+
+            if (hardIssues.length > 0) {
               return {
                 delivered: false,
-                qualityIssues: issues,
+                qualityIssues: hardIssues,
+                warnings,
                 retryGuidance:
-                  "Your campaign was REJECTED for quality violations. Rewrite fixing ALL issues listed above. " +
-                  "Rules: (1) No generic filler — specific numbers, mechanisms, named outcomes only. " +
-                  "(2) No banned opener verbs in headlines (unlock, unleash, elevate, maximize, boost, streamline, empower, etc.). " +
-                  "(3) At least 5 of 15 headlines must have a number, dollar amount, percent, time, or named mechanism. " +
-                  "(4) Primary text needs a CTA verb (book, learn, get, try, request, schedule, etc.). " +
-                  "(5) Include a valid https:// landing page URL. " +
-                  "(6) No near-duplicate headlines — use distinct angles per slot. " +
-                  "Good headlines: 'Cut $150K Manual Ops', '48-Hour AI Audit', '60% Fewer Pipeline Failures', 'Free Architecture Review'."
+                  "Fix the required fields above (landing URL, char limits). " +
+                  "Banned phrases and headline overlap are now warnings — the user can override.",
               };
             }
-            return { delivered: true, name: input.name };
+            return {
+              delivered: true,
+              name: input.name,
+              warnings: warnings.length > 0 ? warnings : undefined,
+            };
           },
         }),
       },

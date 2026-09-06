@@ -19,6 +19,27 @@ export const BANNED_FILLER_PHRASES = [
   "holistic"
 ]
 
+// Industry-specific allowlist: phrases that are normally banned but are
+// legitimate when the user's business is in that industry. E.g. a
+// transformation consultancy CAN say "transform your business" because
+// that's literally what they sell.
+const INDUSTRY_ALLOWLIST: Array<{ phrases: string[]; industries: string[] }> = [
+  { phrases: ["transform your business", "transformation"], industries: ["consulting", "transformation", "change management", "business coaching"] },
+  { phrases: ["revolutionary"], industries: ["research", "scientific", "breakthrough"] },
+  { phrases: ["holistic"], industries: ["wellness", "health", "spa", "yoga", "mindfulness"] },
+  { phrases: ["seamless"], industries: ["logistics", "supply chain", "shipping", "fulfillment"] },
+]
+
+export function isPhraseAllowedForIndustry(phrase: string, industry: string | null | undefined): boolean {
+  if (!industry) return false
+  const lower = industry.toLowerCase()
+  return INDUSTRY_ALLOWLIST.some(
+    (entry) =>
+      entry.phrases.some((p) => p.toLowerCase() === phrase.toLowerCase()) &&
+      entry.industries.some((i) => lower.includes(i)),
+  )
+}
+
 export const GoogleAdGroupSchema = z.object({
   name: z.string().trim().min(1).max(80),
   theme: z.string().trim().max(200).default(""),

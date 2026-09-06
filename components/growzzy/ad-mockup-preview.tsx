@@ -42,20 +42,20 @@ interface AdMockupPreviewProps {
 
 export function AdMockupPreview({
   campaignName,
-  brandName = "MARKITX",
+  brandName,
   platform = "GOOGLE",
-  headlines = ["Deploy Multi-Agent AI in 48h", "Enterprise AI Workflows", "MARKITX AI Stack"],
-  primaryText = "Overcome manual inefficiencies with custom AI agents and enterprise-grade multi-agent infrastructure. Scale operations with zero latency.",
-  descriptions = ["Automate mission-critical workflows with enterprise multi-agent systems.", "SOC2 certified with zero data retention. Book your technical architecture review today."],
-  cta = "Book Architecture Review",
-  landingPage = "https://markitx.ai/solutions",
-  imageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1080&q=80",
-  budgetDaily = 100,
+  headlines = [],
+  primaryText = "",
+  descriptions = [],
+  cta,
+  landingPage = "",
+  imageUrl,
+  budgetDaily,
   currency = "USD",
-  bidding = "Maximize Conversions (Target CPA)",
-  schedule = "Immediate start, run ongoing",
-  keywords = ["[multi-agent systems]", "\"enterprise ai workflows\"", "[custom ai agents]"],
-  exclusions = ["free", "jobs", "salary", "internship", "github", "tutorial", "course"],
+  bidding,
+  schedule,
+  keywords = [],
+  exclusions = [],
   sitelinks,
   className,
 }: AdMockupPreviewProps) {
@@ -65,13 +65,13 @@ export function AdMockupPreview({
   );
   const [copied, setCopied] = useState(false);
 
-  const cleanBrand = brandName || campaignName.split("—")[0]?.trim() || "Brand";
-  const cleanHeadlines = headlines.length > 0 ? headlines : ["High-Converting Ad Headline"];
+  const cleanBrand = brandName || campaignName.split("—")[0]?.trim() || "Your Brand";
+  const cleanHeadlines = headlines.length > 0 ? headlines : [];
   const displayUrl = landingPage
-    .replace(/^https?:\/\//, "")
-    .replace(/\/$/, "");
-  const rootDomain = displayUrl.split("/")[0] || "example.com";
-  const pathSegment = displayUrl.split("/")[1] || "solutions";
+    ? landingPage.replace(/^https?:\/\//, "").replace(/\/$/, "")
+    : "yourwebsite.com";
+  const rootDomain = displayUrl.split("/")[0] || "yourwebsite.com";
+  const pathSegment = displayUrl.split("/")[1] || "landing";
 
   const exportGoogleAdsCsv = () => {
     const headers = [
@@ -90,8 +90,8 @@ export function AdMockupPreview({
     const h1 = (cleanHeadlines[0] || "").replace(/,/g, " ");
     const h2 = (cleanHeadlines[1] || "").replace(/,/g, " ");
     const h3 = (cleanHeadlines[2] || "").replace(/,/g, " ");
-    const d1 = (descriptions[0] || primaryText.slice(0, 90)).replace(/,/g, " ");
-    const d2 = (descriptions[1] || "Book your live demo today.").replace(/,/g, " ");
+    const d1 = (descriptions[0] || primaryText?.slice(0, 90) || "").replace(/,/g, " ");
+    const d2 = (descriptions[1] || "").replace(/,/g, " ");
 
     const row = [
       `"${campaignName}"`,
@@ -206,7 +206,7 @@ export function AdMockupPreview({
 
             {/* Google Search Description */}
             <p className="text-[12.5px] text-[#4D5156] dark:text-[#BDC1C6] leading-relaxed">
-              {descriptions[0] || primaryText.slice(0, 160)}
+              {descriptions[0] || primaryText?.slice(0, 160) || ""}
             </p>
 
             {/* Sitelinks Extension Chips */}
@@ -220,14 +220,18 @@ export function AdMockupPreview({
                 ))
               ) : (
                 <>
-                  <div className="rounded-lg bg-muted/30 p-2 hover:bg-muted/50 cursor-pointer">
-                    <span className="font-medium text-[#1A0DAB] dark:text-[#8AB4F8] block">{cta}</span>
-                    <span className="text-[11px] text-muted-foreground line-clamp-1">Explore custom implementation</span>
-                  </div>
-                  <div className="rounded-lg bg-muted/30 p-2 hover:bg-muted/50 cursor-pointer">
-                    <span className="font-medium text-[#1A0DAB] dark:text-[#8AB4F8] block">Technical Architecture</span>
-                    <span className="text-[11px] text-muted-foreground line-clamp-1">Enterprise-grade deployment</span>
-                  </div>
+                  {cta && (
+                    <div className="rounded-lg bg-muted/30 p-2 hover:bg-muted/50 cursor-pointer">
+                      <span className="font-medium text-[#1A0DAB] dark:text-[#8AB4F8] block">{cta}</span>
+                      <span className="text-[11px] text-muted-foreground line-clamp-1">Learn more</span>
+                    </div>
+                  )}
+                  {cta && (
+                    <div className="rounded-lg bg-muted/30 p-2 hover:bg-muted/50 cursor-pointer">
+                      <span className="font-medium text-[#1A0DAB] dark:text-[#8AB4F8] block">Explore</span>
+                      <span className="text-[11px] text-muted-foreground line-clamp-1">View more</span>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -284,7 +288,7 @@ export function AdMockupPreview({
 
             {/* Meta Primary Copy */}
             <div className="px-3.5 py-2.5 text-[12.5px] text-foreground leading-relaxed whitespace-pre-wrap">
-              {primaryText}
+              {primaryText || ""}
             </div>
 
             {/* 1:1 Creative Visual */}
@@ -338,39 +342,43 @@ export function AdMockupPreview({
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-lg bg-muted/20 p-2.5 border border-border/50">
               <span className="text-muted-foreground block text-[11px]">Daily Budget</span>
-              <span className="font-semibold text-foreground text-[13px]">{currency} {budgetDaily}/day</span>
+              <span className="font-semibold text-foreground text-[13px]">{currency} {budgetDaily != null ? `${budgetDaily}/day` : "—"}</span>
             </div>
             <div className="rounded-lg bg-muted/20 p-2.5 border border-border/50">
               <span className="text-muted-foreground block text-[11px]">Bidding Strategy</span>
-              <span className="font-semibold text-foreground text-[13px]">{bidding}</span>
+              <span className="font-semibold text-foreground text-[13px]">{bidding || "—"}</span>
             </div>
           </div>
 
-          <div className="rounded-lg bg-muted/20 p-3 border border-border/50 space-y-1.5">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground block">
-              Keywords & Match Types
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {keywords.map((kw, i) => (
-                <span key={i} className="rounded bg-background px-2 py-0.5 font-mono text-[11px] border border-border">
-                  {kw}
-                </span>
-              ))}
+          {keywords.length > 0 && (
+            <div className="rounded-lg bg-muted/20 p-3 border border-border/50 space-y-1.5">
+              <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground block">
+                Keywords & Match Types
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {keywords.map((kw, i) => (
+                  <span key={i} className="rounded bg-background px-2 py-0.5 font-mono text-[11px] border border-border">
+                    {kw}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="rounded-lg bg-muted/20 p-3 border border-border/50 space-y-1.5">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground block">
-              Negative Exclusion List
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {exclusions.map((neg, i) => (
-                <span key={i} className="rounded bg-red-500/10 text-red-600 dark:text-red-400 px-2 py-0.5 font-mono text-[11px] border border-red-500/20">
-                  -{neg}
-                </span>
-              ))}
+          {exclusions.length > 0 && (
+            <div className="rounded-lg bg-muted/20 p-3 border border-border/50 space-y-1.5">
+              <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground block">
+                Negative Exclusion List
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {exclusions.map((neg, i) => (
+                  <span key={i} className="rounded bg-red-500/10 text-red-600 dark:text-red-400 px-2 py-0.5 font-mono text-[11px] border border-red-500/20">
+                    -{neg}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>

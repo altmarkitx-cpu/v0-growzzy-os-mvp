@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import { sendEmail } from "@/lib/email"
 
+const PRODUCT_NAME = process.env.PRODUCT_NAME || "Growzzy OS"
+
 type RuleCondition = {
   metric?: "roas" | "spend_budget_ratio" | "conversion_drop"
   operator?: "lt" | "gt" | "lte" | "gte"
@@ -119,7 +121,7 @@ async function executeRule(rule: {
   const actionType = action.type || "email"
   if (actionType === "email" || actionType === "send_report") {
     const subject =
-      rule.type === "WEEKLY_REPORT" ? "GrowzzyOS Weekly Campaign Report" : `GrowzzyOS Automation Alert: ${rule.name}`
+      rule.type === "WEEKLY_REPORT" ? `${PRODUCT_NAME} Weekly Campaign Report` : `${PRODUCT_NAME} Automation Alert: ${rule.name}`
     const html = `
       <div style="font-family:Arial,sans-serif;">
         <h2>${rule.name}</h2>

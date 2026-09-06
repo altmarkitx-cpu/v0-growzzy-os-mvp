@@ -6,6 +6,7 @@ import { rateLimitPolicy, rateLimitResponse } from "@/lib/rate-limit"
 import { UTILITY_MODEL } from "@/lib/ai-utility"
 import { getRequestWorkspaceId } from "@/lib/workspace"
 import { getBusinessContextForWorkspace } from "@/lib/business-context"
+import { getActiveAdAccountScope } from "@/lib/account-scope"
 import { assertCreditsAvailable, estimatedCredits, recordCreditUsage, CreditQuotaError } from "@/lib/ai-credits"
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" })
@@ -15,6 +16,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const userId = await resolveUserId(session.user.id)
   const workspaceId = await getRequestWorkspaceId(userId, req)
+  const scope = await getActiveAdAccountScope(userId, workspaceId)
   const limit = await rateLimitPolicy(userId, "aiUtility")
   if (!limit.allowed) return rateLimitResponse(limit)
 
@@ -30,10 +32,13 @@ export async function POST(req: NextRequest) {
   }
 
   const businessContext = await getBusinessContextForWorkspace(workspaceId)
-  const prompt = `You are a Google Ads keyword strategist. Always personalize keyword ideas using the workspace brand memory below.
+  const isMeta = scope?.platform?.toUpperCase().includes("META") ?? false
+  const isGoogle = scope?.platform?.toUpperCase().includes("GOOGLE") ?? false
+  const platformRole = isMeta ? "Meta Ads targeting strategist" : isGoogle ? "Google Ads keyword strategist" : "paid media keyword strategist"
+  const prompt = `You are a ${platformRole}. Always personalize keyword ideas using the workspace brand memory below.
 ${businessContext}
 
-For a campaign theme about '${theme || "our products/services"}' with goal '${goal || "conversions"}', suggest 15 high-intent keywords. Return ONLY a JSON array: [{ "keyword": string, "matchType": "BROAD"|"PHRASE"|"EXACT", "intent": "high"|"medium", "monthlySearches": "estimated range" }]`
+For a campaign theme about '${theme || "our products/services"}' with goal '${goal || "conversions"}', suggest 15 high-intent ${isMeta ? "interest/behavior targeting concepts" : "keywords"}. Return ONLY a JSON array: [{ "keyword": string, "matchType": "BROAD"|"PHRASE"|"EXACT", "intent": "high"|"medium", "monthlySearches": "estimated range" }]`
   const completion = await openai.chat.completions.create({
     model: UTILITY_MODEL,
     temperature: 0.35,

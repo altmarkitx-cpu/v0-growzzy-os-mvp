@@ -1,5 +1,9 @@
 import { log } from "@/lib/logger"
 
+/** Configurable product/brand name — set PRODUCT_NAME env var to white-label. */
+const PRODUCT_NAME = process.env.PRODUCT_NAME || "Growzzy OS"
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || `${PRODUCT_NAME} <notifications@growzzyos.com>`
+
 type WelcomeEmailInput = {
   email: string
   name?: string | null
@@ -26,7 +30,7 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL || "GROWZZY OS <notifications@growzzyos.com>",
+      from: FROM_EMAIL,
       to: input.to,
       subject: input.subject,
       html: input.html,
@@ -80,11 +84,11 @@ export async function sendWelcomeEmail(input: WelcomeEmailInput): Promise<void> 
 
   await sendEmail({
     to: input.email,
-    subject: "Welcome to GROWZZY OS Beta",
+    subject: `Welcome to ${PRODUCT_NAME} Beta`,
     html: `
         <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827">
           <h2>Hi ${firstName},</h2>
-          <p>Welcome to the GROWZZY OS beta. You're one of our first users and your feedback will shape the product.</p>
+          <p>Welcome to the ${PRODUCT_NAME} beta. You're one of our first users and your feedback will shape the product.</p>
           <p>Here's what you can do right now:</p>
           <ul>
             <li>Connect your Google Ads account in Settings</li>
@@ -93,7 +97,7 @@ export async function sendWelcomeEmail(input: WelcomeEmailInput): Promise<void> 
             <li>Set up automations to protect your budget</li>
           </ul>
           <p>If you have any questions or feedback, just reply to this email.</p>
-          <p>The GROWZZY OS Team</p>
+          <p>The ${PRODUCT_NAME} Team</p>
         </div>
       `,
   })
@@ -102,12 +106,12 @@ export async function sendWelcomeEmail(input: WelcomeEmailInput): Promise<void> 
 export async function sendPasswordResetEmail(input: { email: string; resetUrl: string }): Promise<void> {
   await sendEmail({
     to: input.email,
-    subject: "Reset your GROWZZY OS password",
+    subject: `Reset your ${PRODUCT_NAME} password`,
     text: `Reset your password: ${input.resetUrl}`,
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827">
         <h2>Reset your password</h2>
-        <p>Use the secure link below to reset your GROWZZY OS password. This link expires in 30 minutes.</p>
+        <p>Use the secure link below to reset your ${PRODUCT_NAME} password. This link expires in 30 minutes.</p>
         <p><a href="${input.resetUrl}" style="display:inline-block;background:#111;color:#fff;padding:10px 14px;border-radius:10px;text-decoration:none">Reset password</a></p>
         <p>If you did not request this, you can ignore this email.</p>
       </div>
@@ -119,12 +123,12 @@ export async function sendEmailVerification(input: { email: string; verifyUrl: s
   const firstName = input.name?.trim() || "there"
   await sendEmail({
     to: input.email,
-    subject: "Verify your GROWZZY OS email",
+    subject: `Verify your ${PRODUCT_NAME} email`,
     text: `Verify your email: ${input.verifyUrl}`,
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827">
         <h2>Hi ${firstName}, verify your email</h2>
-        <p>Confirm your email address to finish securing your GROWZZY OS account.</p>
+        <p>Confirm your email address to finish securing your ${PRODUCT_NAME} account.</p>
         <p><a href="${input.verifyUrl}" style="display:inline-block;background:#2147E6;color:#fff;padding:10px 14px;border-radius:10px;text-decoration:none">Verify email</a></p>
         <p>This link expires in 24 hours.</p>
       </div>

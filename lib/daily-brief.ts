@@ -56,11 +56,11 @@ function ctrWindow(campaign: CampaignWithMetrics, days: number) {
   return impressions > 0 ? (clicks / impressions) * 100 : 0
 }
 
-export function buildDailyBriefFromCampaigns(campaigns: CampaignWithMetrics[]) {
+export function buildDailyBriefFromCampaigns(campaigns: CampaignWithMetrics[], riskLevel?: string | null) {
   const averages = calculateAccountAverages(campaigns)
-  const analyzed = analyzeCampaigns(campaigns, averages)
+  const analyzed = analyzeCampaigns(campaigns, averages, riskLevel)
   const scoreData = calculateAuditScores(campaigns, averages)
-  const recommendations = buildRuleRecommendations(campaigns, averages).map((rec) => enrichRecommendation(rec, campaigns))
+  const recommendations = buildRuleRecommendations(campaigns, averages, riskLevel).map((rec) => enrichRecommendation(rec, campaigns))
 
   const zeroConversionWasteCampaigns = campaigns
     .map((campaign) => ({

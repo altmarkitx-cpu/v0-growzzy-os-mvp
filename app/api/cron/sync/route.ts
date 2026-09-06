@@ -9,6 +9,8 @@ import { normalizeReportType, renderReportHtml } from "@/lib/report-template-ren
 import { getIntegrationAccessToken } from "@/lib/integration-tokens"
 import { resetDueWorkspaceCredits } from "@/lib/ai-credits"
 
+const PRODUCT_NAME = process.env.PRODUCT_NAME || "Growzzy OS"
+
 export const dynamic = "force-dynamic"
 export const maxDuration = 300
 
@@ -170,7 +172,7 @@ export async function GET(req: Request) {
 
       await sendEmail({
         to: schedule.sendTo || schedule.user.email,
-        subject: `GrowzzyOS Report: ${schedule.name}`,
+        subject: `${PRODUCT_NAME} Report: ${schedule.name}`,
         html: rendered.html,
       })
 

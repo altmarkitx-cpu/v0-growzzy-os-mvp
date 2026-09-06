@@ -15,9 +15,11 @@ type OnboardingState = {
   google: { connected: boolean; accountId: string }
 }
 
+const PRODUCT_NAME = process.env.NEXT_PUBLIC_PRODUCT_NAME || "Growzzy OS"
+
 const DEFAULT_STATE: OnboardingState = {
   currentStep: 2,
-  identity: { name: "Growzzy user", email: "" },
+  identity: { name: `${PRODUCT_NAME} user`, email: "" },
   workspace: {
     businessName: "",
     websiteUrl: "",
